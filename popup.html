@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkedIn Copilot</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <span class="logo">LinkedIn Copilot</span>
+      <button id="logoutBtn" class="btn-ghost" style="display:none;">Sign out</button>
+    </div>
+
+    <!-- Auth Screen -->
+    <div id="authScreen">
+      <p class="subtitle">Sign in to generate messages</p>
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" placeholder="johndoe" />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" />
+      </div>
+      <p id="authError" class="error" style="display:none;"></p>
+      <button id="loginBtn" class="btn-primary">Sign in</button>
+    </div>
+
+    <!-- Main Screen -->
+    <div id="mainScreen" style="display:none;">
+      <div id="profileBadge" class="profile-badge" style="display:none;">
+        <span class="badge-dot"></span>
+        <span id="profileName">Profile detected</span>
+      </div>
+
+      <div class="form-group">
+        <label for="genType">Message Type</label>
+        <select id="genType">
+          <option value="connection_request">Connection Request</option>
+          <option value="referral_request">Referral Request</option>
+          <option value="recruiter_reply">Recruiter Reply</option>
+          <option value="followup">Follow-Up</option>
+        </select>
+      </div>
+
+      <!-- Connection Request Fields -->
+      <div id="fields-connection_request" class="fields">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="cr-name" placeholder="Jane Smith" />
+        </div>
+        <div class="form-group">
+          <label>Company</label>
+          <input type="text" id="cr-company" placeholder="Acme Corp" />
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <input type="text" id="cr-role" placeholder="Engineer" />
+        </div>
+      </div>
+
+      <!-- Referral Request Fields -->
+      <div id="fields-referral_request" class="fields" style="display:none;">
+        <div class="form-group">
+          <label>Referrer's Name</label>
+          <input type="text" id="rr-name" placeholder="Jane Smith" />
+        </div>
+        <div class="form-group">
+          <label>Company</label>
+          <input type="text" id="rr-company" placeholder="Acme Corp" />
+        </div>
+        <div class="form-group">
+          <label>Referrer's Role</label>
+          <input type="text" id="rr-role" placeholder="Engineer" />
+        </div>
+        <div class="form-group">
+          <label>Job You're Applying For</label>
+          <input type="text" id="rr-job" placeholder="Frontend Engineer" />
+        </div>
+        <div class="form-group">
+          <label>Your Background</label>
+          <textarea id="rr-background" placeholder="3 years React experience..."></textarea>
+        </div>
+      </div>
+
+      <!-- Recruiter Reply Fields -->
+      <div id="fields-recruiter_reply" class="fields" style="display:none;">
+        <div class="form-group">
+          <label>Recruiter's Name</label>
+          <input type="text" id="rec-name" placeholder="John Doe" />
+        </div>
+        <div class="form-group">
+          <label>Company</label>
+          <input type="text" id="rec-company" placeholder="Acme Corp" />
+        </div>
+        <div class="form-group">
+          <label>Job Title</label>
+          <input type="text" id="rec-job" placeholder="Frontend Engineer" />
+        </div>
+        <div class="form-group">
+          <label>Your Background</label>
+          <textarea id="rec-background" placeholder="3 years React experience..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Interest Level</label>
+          <select id="rec-interest">
+            <option value="very interested">Very Interested</option>
+            <option value="somewhat interested">Somewhat Interested</option>
+            <option value="not interested">Not Interested</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Follow-Up Fields -->
+      <div id="fields-followup" class="fields" style="display:none;">
+        <div class="form-group">
+          <label>Their Name</label>
+          <input type="text" id="fu-name" placeholder="Jane Smith" />
+        </div>
+        <div class="form-group">
+          <label>Company</label>
+          <input type="text" id="fu-company" placeholder="Acme Corp" />
+        </div>
+        <div class="form-group">
+          <label>Their Role</label>
+          <input type="text" id="fu-role" placeholder="Engineer" />
+        </div>
+        <div class="form-group">
+          <label>Previous Interaction</label>
+          <textarea id="fu-context" placeholder="Met at React conf..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Days Since Last Contact</label>
+          <input type="number" id="fu-days" placeholder="7" />
+        </div>
+      </div>
+
+      <!-- Tone Selector -->
+      <div class="tone-group">
+        <label>Tone</label>
+        <div class="tone-buttons">
+          <button class="tone-btn active" data-tone="formal">
+            <span class="tone-label">Formal</span>
+            <span class="tone-desc">Professional</span>
+          </button>
+          <button class="tone-btn" data-tone="friendly">
+            <span class="tone-label">Friendly</span>
+            <span class="tone-desc">Warm</span>
+          </button>
+          <button class="tone-btn" data-tone="concise">
+            <span class="tone-label">Concise</span>
+            <span class="tone-desc">Short</span>
+          </button>
+        </div>
+      </div>
+
+      <p id="genError" class="error" style="display:none;"></p>
+      <button id="generateBtn" class="btn-primary">Generate Message</button>
+
+      <!-- Output -->
+      <div id="outputSection" style="display:none;">
+        <div class="output-header">
+          <label>Generated Message</label>
+          <button id="copyBtn" class="btn-ghost">Copy</button>
+        </div>
+        <textarea id="outputText" readonly rows="5"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
