@@ -1,5 +1,7 @@
 # ConnectPilot — Chrome Extension
 
+[![CI](https://github.com/pk2502/linkedin-copilot-extension/actions/workflows/ci.yml/badge.svg)](https://github.com/pk2502/linkedin-copilot-extension/actions/workflows/ci.yml)
+
 Draft LinkedIn connection requests, referral asks, recruiter replies and follow-ups with AI, right from a LinkedIn profile. ConnectPilot only drafts: you review, copy and send messages yourself. It never clicks, sends or automates anything on LinkedIn.
 
 ## Features
@@ -67,3 +69,5 @@ The zip contains only the runtime files and is ready for the Chrome Web Store.
 ## Web app
 
 [li-copilot.vercel.app](https://li-copilot.vercel.app)
+
+CI runs the tests and builds the package on every push; the zip is attached to each run as the `connectpilot-extension` artifact.
