@@ -71,3 +71,7 @@ The zip contains only the runtime files and is ready for the Chrome Web Store.
 [li-copilot.vercel.app](https://li-copilot.vercel.app)
 
 CI runs the tests and builds the package on every push; the zip is attached to each run as the `connectpilot-extension` artifact.
+
+## Chrome Web Store
+
+`npm run package:store` builds `dist/connectpilot-extension-<version>-store.zip`, identical to the regular package except that the `localhost` development hosts are removed from the manifest. Listing text, permission justifications, privacy answers, reviewer notes and images are in [`store/`](store/LISTING.md). Regenerate the screenshots with `python3 store/tools/shots.py` (needs Python Playwright). Privacy policy: https://li-copilot.vercel.app/privacy
