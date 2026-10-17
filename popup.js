@@ -74,7 +74,7 @@ connectBtn.addEventListener("click", () => {
 });
 
 logoutBtn.addEventListener("click", async () => {
-  await api.clearSession();
+  await api.logout();
   showAuth();
 });
 

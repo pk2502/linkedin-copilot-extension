@@ -189,3 +189,50 @@ describe("clearSession", () => {
     assert.equal(await api.isSignedIn(), false);
   });
 });
+
+describe("logout", () => {
+  const LOGOUT_URL = `${API}/api/auth/logout/`;
+
+  it("clears tokens and revokes the refresh token", async () => {
+    const storage = memoryStorage({ access_token: "a1", refresh_token: "r1" });
+    const fetchImpl = fakeFetch(() => json(200, {}));
+    const api = createApi({ storage, fetchImpl, apiBase: API });
+
+    await api.logout();
+
+    assert.deepEqual(storage.data, {});
+    assert.equal(fetchImpl.calls.length, 1);
+    assert.equal(fetchImpl.calls[0].url, LOGOUT_URL);
+    assert.deepEqual(fetchImpl.calls[0].body, { refresh: "r1" });
+  });
+
+  it("signs out locally even when the request fails or hangs", async () => {
+    for (const handler of [
+      () => Promise.reject(new TypeError("Failed to fetch")),
+      (_url, init) => new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(new Error("aborted")))),
+    ]) {
+      const storage = memoryStorage({ access_token: "a1", refresh_token: "r1" });
+      const api = createApi({ storage, fetchImpl: fakeFetch(handler), apiBase: API });
+
+      await api.logout({ timeoutMs: 20 });
+
+      assert.deepEqual(storage.data, {});
+    }
+  });
+
+  it("makes no request without a refresh token", async () => {
+    const storage = memoryStorage({ access_token: "a1" });
+    const fetchImpl = fakeFetch(() => json(200, {}));
+    const api = createApi({ storage, fetchImpl, apiBase: API });
+
+    await api.logout();
+
+    assert.equal(fetchImpl.calls.length, 0);
+  });
+});
+
+describe("errorMessage for provider failures", () => {
+  it("maps 502 to a retry message", () => {
+    assert.equal(errorMessage(new ApiError(502, "x")), "AI service is busy. Try again in a moment.");
+  });
+});

@@ -29,6 +29,7 @@ export function errorMessage(error) {
   if (error instanceof ApiError) {
     if (error.status === 429) return "Daily limit reached (20 messages per day). Try again tomorrow.";
     if (error.status === 400) return "Please check the fields and try again.";
+    if (error.status === 502) return "AI service is busy. Try again in a moment.";
   }
   return "Failed to generate. Try again.";
 }
@@ -141,10 +142,35 @@ export function createApi({ storage, fetchImpl = (...args) => fetch(...args), ap
     return request(`/api/generate/${endpoint}/`, { method: "POST", body: payload });
   }
 
+  /**
+   * Sign out: clear local tokens first, then ask the backend to revoke this
+   * extension's refresh token. Best-effort with a short timeout; an offline or
+   * failed request still leaves the user signed out locally.
+   */
+  async function logout({ timeoutMs = 3000 } = {}) {
+    const { refresh } = await getTokens();
+    await clearSession();
+    if (!refresh) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      await fetchImpl(`${apiBase}/api/auth/logout/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh }),
+        signal: controller.signal,
+      });
+    } catch {
+      // The token still expires on its own.
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function isSignedIn() {
     const { access, refresh } = await getTokens();
     return Boolean(access || refresh);
   }
 
-  return { getTokens, startSession, clearSession, refreshAccessToken, request, login, generate, isSignedIn };
+  return { getTokens, startSession, clearSession, refreshAccessToken, request, login, logout, generate, isSignedIn };
 }
