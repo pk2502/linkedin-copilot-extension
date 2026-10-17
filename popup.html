@@ -3,20 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LinkedIn Copilot</title>
+  <title>ConnectPilot</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="container">
     <!-- Header -->
     <div class="header">
-      <span class="logo">LinkedIn Copilot</span>
+      <span class="logo"><img src="icon48.png" alt="" class="logo-mark" />ConnectPilot</span>
       <button id="logoutBtn" class="btn-ghost" style="display:none;">Sign out</button>
     </div>
 
     <!-- Auth Screen -->
     <div id="authScreen">
-      <p class="subtitle">Sign in to generate messages</p>
+      <p class="subtitle">Sign in to draft LinkedIn messages. You review and send them yourself.</p>
+      <p id="authNotice" class="notice" style="display:none;"></p>
+      <button id="connectBtn" class="btn-primary">Sign in with ConnectPilot</button>
+      <p class="hint">Opens the web app. Works with Google sign-in.</p>
+      <div class="divider"><span>or use your username</span></div>
       <div class="form-group">
         <label for="username">Username</label>
         <input type="text" id="username" placeholder="johndoe" />
@@ -26,7 +30,7 @@
         <input type="password" id="password" placeholder="••••••••" />
       </div>
       <p id="authError" class="error" style="display:none;"></p>
-      <button id="loginBtn" class="btn-primary">Sign in</button>
+      <button id="loginBtn" class="btn-secondary">Sign in</button>
     </div>
 
     <!-- Main Screen -->
@@ -171,6 +175,6 @@
     </div>
   </div>
 
-  <script src="popup.js"></script>
+  <script type="module" src="popup.js"></script>
 </body>
 </html>

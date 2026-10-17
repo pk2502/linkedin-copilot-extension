@@ -1,0 +1,14 @@
+{
+  "name": "connectpilot-extension",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ConnectPilot Chrome extension (Manifest V3). No build step; package.json only enables tests.",
+  "scripts": {
+    "test": "node --test",
+    "package": "sh scripts/package.sh"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

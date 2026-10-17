@@ -1,13 +1,18 @@
-const API_BASE = "https://linkedin-copilot.duckdns.org";
+import { API_BASE, WEB_BASE } from "./config.js";
+import { ApiError, SessionExpiredError, createApi, errorMessage } from "./api.js";
+
+const api = createApi({ storage: chrome.storage.local, apiBase: API_BASE });
 
 // --- DOM refs ---
 const authScreen = document.getElementById("authScreen");
 const mainScreen = document.getElementById("mainScreen");
 const logoutBtn = document.getElementById("logoutBtn");
 const loginBtn = document.getElementById("loginBtn");
+const connectBtn = document.getElementById("connectBtn");
 const generateBtn = document.getElementById("generateBtn");
 const copyBtn = document.getElementById("copyBtn");
 const authError = document.getElementById("authError");
+const authNotice = document.getElementById("authNotice");
 const genError = document.getElementById("genError");
 const outputSection = document.getElementById("outputSection");
 const outputText = document.getElementById("outputText");
@@ -19,17 +24,8 @@ let selectedTone = "formal";
 
 // --- Init ---
 document.addEventListener("DOMContentLoaded", async () => {
-  const { access_token } = await chrome.storage.local.get("access_token");
-  if (access_token) {
-    showMain();
-    await loadProfileData();
-  } else {
-    showAuth();
-  }
-
   genTypeSelect.addEventListener("change", switchFields);
 
-  // Tone buttons
   document.querySelectorAll(".tone-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".tone-btn").forEach((b) => b.classList.remove("active"));
@@ -37,45 +33,48 @@ document.addEventListener("DOMContentLoaded", async () => {
       selectedTone = btn.dataset.tone;
     });
   });
+
+  if (await api.isSignedIn()) {
+    showMain();
+    await loadProfileData();
+  } else {
+    showAuth();
+  }
 });
 
 // --- Auth ---
 loginBtn.addEventListener("click", async () => {
   const username = document.getElementById("username").value.trim();
-  const password = document.getElementById("password").value.trim();
+  const password = document.getElementById("password").value;
 
   if (!username || !password) return showAuthError("Fill in all fields.");
 
   loginBtn.textContent = "Signing in...";
   loginBtn.disabled = true;
+  hideAuthMessages();
 
   try {
-    const res = await fetch(`${API_BASE}/api/auth/login/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!res.ok) throw new Error("Invalid credentials");
-
-    const data = await res.json();
-    await chrome.storage.local.set({
-      access_token: data.access,
-      refresh_token: data.refresh,
-    });
-
+    await api.login(username, password);
+    document.getElementById("password").value = "";
     showMain();
     await loadProfileData();
   } catch (e) {
-    showAuthError("Invalid username or password.");
+    showAuthError(e instanceof ApiError ? e.message : "Sign-in failed. Check your connection.");
   } finally {
     loginBtn.textContent = "Sign in";
     loginBtn.disabled = false;
   }
 });
 
+// Sign in through the web app (works for Google accounts too). The web app
+// mints a token pair for the extension and connect.js stores it.
+connectBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: `${WEB_BASE}/connect-extension` });
+  window.close();
+});
+
 logoutBtn.addEventListener("click", async () => {
-  await chrome.storage.local.remove(["access_token", "refresh_token"]);
+  await api.clearSession();
   showAuth();
 });
 
@@ -86,7 +85,6 @@ generateBtn.addEventListener("click", async () => {
 
   if (!payload) return;
 
-  // Add tone to payload
   payload.tone = selectedTone;
 
   genError.style.display = "none";
@@ -95,32 +93,15 @@ generateBtn.addEventListener("click", async () => {
   generateBtn.disabled = true;
 
   try {
-    const { access_token } = await chrome.storage.local.get("access_token");
-    const endpoint = getEndpoint(type);
-
-    const res = await fetch(`${API_BASE}/api/generate/${endpoint}/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${access_token}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (res.status === 401) {
-      await chrome.storage.local.remove(["access_token", "refresh_token"]);
-      showAuth();
-      return;
-    }
-
-    if (!res.ok) throw new Error("Generation failed");
-
-    const data = await res.json();
+    const data = await api.generate(getEndpoint(type), payload);
     outputText.value = data.message;
     outputSection.style.display = "block";
   } catch (e) {
-    genError.textContent = "Failed to generate. Try again.";
-    genError.style.display = "block";
+    if (e instanceof SessionExpiredError) {
+      showAuth("Your session expired. Sign in again.");
+      return;
+    }
+    showGenError(errorMessage(e));
   } finally {
     generateBtn.textContent = "Generate Message";
     generateBtn.disabled = false;
@@ -131,10 +112,10 @@ generateBtn.addEventListener("click", async () => {
 copyBtn.addEventListener("click", () => {
   navigator.clipboard.writeText(outputText.value);
   copyBtn.textContent = "Copied!";
-  setTimeout(() => copyBtn.textContent = "Copy", 2000);
+  setTimeout(() => (copyBtn.textContent = "Copy"), 2000);
 });
 
-// --- Profile extraction via scripting API ---
+// --- Profile extraction via scripting API (activeTab, granted when the popup opens) ---
 async function loadProfileData() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -167,10 +148,10 @@ async function loadProfileData() {
           const section = document.querySelector('section[aria-label="Primary content"]');
           if (section) {
             const text = section.textContent.trim();
-            const escapedRole = data.role.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const match = text.match(new RegExp(escapedRole + '([^·\n]+)'));
+            const escapedRole = data.role.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const match = text.match(new RegExp(escapedRole + "([^·\n]+)"));
             if (match) {
-              const candidate = match[1].trim().split('·')[0].trim();
+              const candidate = match[1].trim().split("·")[0].trim();
               if (candidate && candidate.length > 0 && candidate.length < 80) {
                 data.company = candidate;
               }
@@ -206,16 +187,21 @@ async function loadProfileData() {
       const el = document.getElementById(id);
       if (el && value) el.value = value;
     }
-  } catch (e) {
-    // Silent fail
+  } catch {
+    // Not a profile page or LinkedIn's markup changed: leave fields for manual entry.
   }
 }
 
 // --- Helpers ---
-function showAuth() {
+function showAuth(notice) {
   authScreen.style.display = "block";
   mainScreen.style.display = "none";
   logoutBtn.style.display = "none";
+  hideAuthMessages();
+  if (notice) {
+    authNotice.textContent = notice;
+    authNotice.style.display = "block";
+  }
 }
 
 function showMain() {
@@ -224,13 +210,18 @@ function showMain() {
   logoutBtn.style.display = "block";
 }
 
+function hideAuthMessages() {
+  authError.style.display = "none";
+  authNotice.style.display = "none";
+}
+
 function showAuthError(msg) {
   authError.textContent = msg;
   authError.style.display = "block";
 }
 
 function switchFields() {
-  document.querySelectorAll(".fields").forEach((f) => f.style.display = "none");
+  document.querySelectorAll(".fields").forEach((f) => (f.style.display = "none"));
   const active = document.getElementById(`fields-${genTypeSelect.value}`);
   if (active) active.style.display = "block";
 }
