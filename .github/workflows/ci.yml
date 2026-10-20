@@ -21,6 +21,11 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          cache: npm
+
+      # Test tooling only (jsdom); the extension itself has no dependencies.
+      - name: Install test dependencies
+        run: npm ci
 
       - name: Tests
         run: npm test

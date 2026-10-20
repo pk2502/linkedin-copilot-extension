@@ -2,15 +2,42 @@
 // Used only to produce store screenshots; never shipped.
 (() => {
   const mode = new URLSearchParams(location.search).get("mode") || "main";
-  const store = mode === "main" ? { access_token: "a.b.c", refresh_token: "d.e.f" } : {};
+  const store = mode === "signin" ? {} : { access_token: "a.b.c", refresh_token: "d.e.f" };
   window.chrome = {
     storage: { local: {
       get: async (keys) => Object.fromEntries([].concat(keys).filter((k) => k in store).map((k) => [k, store[k]])),
       set: async (items) => Object.assign(store, items),
       remove: async (keys) => [].concat(keys).forEach((k) => delete store[k]),
     } },
-    tabs: { query: async () => [{ id: 1, url: "https://www.linkedin.com/in/sample-profile/" }], create: () => {} },
-    scripting: { executeScript: async () => [{ result: { isLinkedInProfile: true, name: "Maya Chen", role: "Engineering Manager", company: "Northwind Labs" } }] },
+    tabs: {
+      query: async () => [{
+        id: 1,
+        url: mode === "job"
+          ? "https://www.linkedin.com/jobs/view/4012345678/"
+          : "https://www.linkedin.com/in/sample-profile/",
+      }],
+      create: () => {},
+    },
+    scripting: {
+      executeScript: async ({ func, args }) => {
+        const name = func?.name;
+        if (name === "readProfileSections") {
+          return [{ result: {
+            about: "Engineering manager at Northwind Labs. Speaker on scaling frontend teams.",
+            experience: "Engineering Manager\nNorthwind Labs\n2022 - Present",
+            education: "",
+          } }];
+        }
+        if (name === "readJobPosting") {
+          return [{ result: { title: "Staff Frontend Engineer", company: "Contoso Cloud", description: "7+ years React, design systems." } }];
+        }
+        if (name === "insertIntoLinkedIn") {
+          window.__inserted = args[0];
+          return [{ result: { ok: true, kind: "message" } }];
+        }
+        return [{ result: { isLinkedInProfile: true, name: "Maya Chen", role: "Engineering Manager", company: "Northwind Labs" } }];
+      },
+    },
   };
   const reply = (body, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });

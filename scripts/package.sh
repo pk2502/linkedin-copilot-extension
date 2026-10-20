@@ -5,7 +5,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 VERSION=$(node -p "require('./manifest.json').version")
-FILES="popup.html popup.js api.js config.js connect.js styles.css icon16.png icon48.png icon128.png"
+FILES="popup.html popup.js api.js config.js connect.js page.js job-store.js styles.css icon16.png icon48.png icon128.png"
 mkdir -p dist
 
 if [ "${1:-}" = "--store" ]; then

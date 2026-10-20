@@ -1,5 +1,14 @@
 import { API_BASE, WEB_BASE } from "./config.js";
 import { ApiError, SessionExpiredError, createApi, errorMessage } from "./api.js";
+import { clearPendingJob, jobDescriptionFor, loadPendingJob, savePendingJob } from "./job-store.js";
+import {
+  formatRecipientContext,
+  insertIntoLinkedIn,
+  isJobPage,
+  isProfilePage,
+  readJobPosting,
+  readProfileSections,
+} from "./page.js";
 
 const api = createApi({ storage: chrome.storage.local, apiBase: API_BASE });
 
@@ -23,6 +32,20 @@ const profileNudge = document.getElementById("profileNudge");
 const charCount = document.getElementById("charCount");
 const variantTabs = [...document.querySelectorAll(".variant-tab")];
 const tweakButtons = [...document.querySelectorAll(".tweak-btn")];
+const contextChip = document.getElementById("contextChip");
+const contextSummary = document.getElementById("contextSummary");
+const jobBanner = document.getElementById("jobBanner");
+const jobBannerTitle = document.getElementById("jobBannerTitle");
+const jobChip = document.getElementById("jobChip");
+const jobChipTitle = document.getElementById("jobChipTitle");
+const insertBtn = document.getElementById("insertBtn");
+const insertStatus = document.getElementById("insertStatus");
+
+// Page context for the current draft. Sent to the API for the prompt only.
+let activeTabId = null;
+let recipientContext = "";
+let detectedJob = null;
+let pendingJob = null;
 
 const PROFILE_NUDGE_BELOW = 50;
 
@@ -47,6 +70,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   variantTabs.forEach((tab) => tab.addEventListener("click", () => selectVariant(Number(tab.dataset.variant))));
   tweakButtons.forEach((btn) => btn.addEventListener("click", () => tweakActive(btn.dataset.tweak)));
+  document.getElementById("clearContextBtn").addEventListener("click", () => {
+    recipientContext = "";
+    contextChip.style.display = "none";
+  });
+  document.getElementById("useJobBtn").addEventListener("click", useDetectedJob);
+  document.getElementById("clearJobBtn").addEventListener("click", async () => {
+    await clearPendingJob(chrome.storage.local);
+    pendingJob = null;
+    renderJobChip();
+  });
+  insertBtn.addEventListener("click", insertActiveDraft);
   profileNudge.addEventListener("click", (event) => {
     event.preventDefault();
     chrome.tabs.create({ url: `${WEB_BASE}/dashboard/profile` });
@@ -107,9 +141,12 @@ generateBtn.addEventListener("click", async () => {
   if (!payload) return;
 
   payload.tone = selectedTone;
+  if (recipientContext) payload.recipient_context = recipientContext;
+  if (type === "referral_request" && pendingJob) payload.job_description = jobDescriptionFor(pendingJob);
 
   genError.style.display = "none";
   outputSection.style.display = "none";
+  insertStatus.style.display = "none";
   generateBtn.textContent = "Writing 3 drafts...";
   generateBtn.disabled = true;
 
@@ -188,7 +225,16 @@ async function loadProfileNudge() {
 async function loadProfileData() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !tab.url?.includes("linkedin.com/in/")) return;
+    activeTabId = tab?.id ?? null;
+    pendingJob = await loadPendingJob(chrome.storage.local);
+    renderJobChip();
+    if (!tab?.id) return;
+    if (isJobPage(tab.url)) {
+      await loadJobPosting(tab.id);
+      return;
+    }
+    if (!isProfilePage(tab.url)) return;
+    loadRecipientContext(tab.id);
 
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -258,6 +304,93 @@ async function loadProfileData() {
     }
   } catch {
     // Not a profile page or LinkedIn's markup changed: leave fields for manual entry.
+  }
+}
+
+// --- Page context: profile sections and job postings ---
+async function loadRecipientContext(tabId) {
+  try {
+    const [result] = await chrome.scripting.executeScript({ target: { tabId }, func: readProfileSections });
+    const sections = result?.result;
+    recipientContext = formatRecipientContext(sections);
+    if (!recipientContext) return;
+    const mark = (text) => (text ? "✓" : "–");
+    contextSummary.textContent =
+      `Using from page: About ${mark(sections.about)} · Experience ${mark(sections.experience)} · ` +
+      `Education ${mark(sections.education)}`;
+    contextChip.style.display = "flex";
+  } catch {
+    // Page layout not recognised: draft with name, role and company only.
+  }
+}
+
+async function loadJobPosting(tabId) {
+  try {
+    const [result] = await chrome.scripting.executeScript({ target: { tabId }, func: readJobPosting });
+    detectedJob = result?.result ?? null;
+    if (!detectedJob) return;
+    jobBannerTitle.textContent = detectedJob.company
+      ? `${detectedJob.title} at ${detectedJob.company}`
+      : detectedJob.title;
+    jobBanner.style.display = "flex";
+  } catch {
+    // Not a readable job page.
+  }
+}
+
+async function useDetectedJob() {
+  if (!detectedJob) return;
+  pendingJob = await savePendingJob(chrome.storage.local, detectedJob);
+  genTypeSelect.value = "referral_request";
+  switchFields();
+  document.getElementById("rr-job").value = pendingJob.title;
+  if (pendingJob.company) document.getElementById("rr-company").value = pendingJob.company;
+  jobBanner.style.display = "none";
+  renderJobChip();
+  showGenError(
+    `Saved. Now open the profile of someone at ${pendingJob.company || "the company"} and click ConnectPilot to ask for a referral.`
+  );
+  genError.classList.add("info");
+}
+
+function renderJobChip() {
+  if (pendingJob) {
+    jobChipTitle.textContent = pendingJob.company ? `${pendingJob.title} at ${pendingJob.company}` : pendingJob.title;
+    jobChip.style.display = "flex";
+    if (!document.getElementById("rr-job").value) document.getElementById("rr-job").value = pendingJob.title;
+  } else {
+    jobChip.style.display = "none";
+  }
+}
+
+// --- Insert into LinkedIn (types the draft; never sends) ---
+async function insertActiveDraft() {
+  const text = outputText.value;
+  if (!text || activeTabId === null) return;
+  const show = (message) => {
+    insertStatus.textContent = message;
+    insertStatus.style.display = "block";
+  };
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: activeTabId },
+      func: insertIntoLinkedIn,
+      args: [text],
+    });
+    const outcome = result?.result;
+    if (outcome?.ok) {
+      show("Inserted. Review it in LinkedIn, then press Send yourself.");
+      return;
+    }
+    await navigator.clipboard.writeText(text);
+    if (outcome?.reason === "too_long") {
+      show(`Too long for this note (max ${outcome.max} characters). Copied instead; try "Shorter".`);
+    } else {
+      show("Open the LinkedIn message box first. Copied to your clipboard instead.");
+    }
+  } catch {
+    await navigator.clipboard.writeText(text).catch(() => {});
+    show("Couldn't reach the LinkedIn tab. Copied to your clipboard instead.");
   }
 }
 
@@ -337,6 +470,7 @@ function getPayload(type) {
 }
 
 function showGenError(msg) {
+  genError.classList.remove("info");
   genError.textContent = msg;
   genError.style.display = "block";
 }

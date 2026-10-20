@@ -351,3 +351,44 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+
+/* --- Page context (1.4) --- */
+.context-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 6px 8px;
+  border: 1px dashed #c7c9d1;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #444;
+}
+
+.chip-clear {
+  border: none;
+  background: none;
+  color: #4f46e5;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.job-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.output-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.error.info {
+  color: #3730a3;
+  background: #eef2ff;
+  border-radius: 6px;
+  padding: 6px 8px;
+}

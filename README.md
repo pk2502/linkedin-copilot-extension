@@ -8,7 +8,9 @@ Draft LinkedIn connection requests, referral asks, recruiter replies and follow-
 
 - 4 message types: Connection Request, Referral Request, Recruiter Reply, Follow-Up
 - 3 tones: Formal, Friendly, Concise
-- Auto-fills name, role and company from the LinkedIn profile you have open
+- Auto-fills name, role and company from the LinkedIn profile you have open, and uses the visible About, experience and education sections to find genuine common ground (shown in the popup, with a Clear button)
+- On a LinkedIn job page: "Ask for a referral for this job" saves the job (for 24 hours, in the extension only) and tailors the referral ask to it
+- Insert: types the chosen draft into the LinkedIn message box or invitation note you have open. It never presses Send
 - Three drafts per request, each from a different angle, written with your saved ConnectPilot profile
 - One-click tweaks: shorter, warmer, more specific, more formal
 - One-click copy
@@ -40,9 +42,9 @@ Fill in your profile once at https://connect-pilot.vercel.app/dashboard/profile 
 
 | Permission | Why |
 | --- | --- |
-| `activeTab`, `scripting` | Read the open LinkedIn profile (name, headline) when you click the icon. |
 | `storage` | Keep your sign-in tokens in the extension's local storage. |
 | `https://connectpilot-api.onrender.com/*` | Call the ConnectPilot API. |
+| `activeTab` + `scripting` | Read the LinkedIn profile or job page you have open when you open the popup, and type a draft into the message box when you click Insert |
 | Content script on `connect-pilot.vercel.app/connect-extension` | Receive the sign-in from the web app. It runs on no other page. |
 
 `http://localhost:8001/*` and `http://localhost:3000/connect-extension*` are included for local development.
@@ -54,11 +56,14 @@ No build step. Edit the files and click **Reload** on `chrome://extensions`.
 - API and web app URLs live in `config.js`.
 - `api.js`: token storage, single-flight token refresh, authenticated requests.
 - `connect.js`: content script for the web app sign-in hand-off.
+- `page.js`: functions injected into the LinkedIn tab (read profile sections and job postings, insert a draft). Self-contained, read-only except Insert, never sends.
+- `job-store.js`: the job saved for a referral ask (local, 24 hours).
 - `popup.html` / `popup.js` / `styles.css`: the popup UI.
 
-Tests use Node's built-in test runner (Node 20+, no dependencies):
+Tests use Node's built-in test runner (Node 22.22.2+) and jsdom with saved LinkedIn-like pages in `tests/fixtures/`:
 
 ```sh
+npm ci     # test tooling (jsdom) only; the extension has no runtime dependencies
 npm test
 ```
 
