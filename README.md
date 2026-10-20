@@ -22,7 +22,7 @@ Draft LinkedIn connection requests, referral asks, recruiter replies and follow-
 
 ## Sign in
 
-- **Sign in with ConnectPilot** (recommended, works with Google): opens `li-copilot.vercel.app/connect-extension`. Sign in there if needed; the page creates a separate session for the extension and hands it over. Close the tab and open the extension.
+- **Sign in with ConnectPilot** (recommended, works with Google): opens `connect-pilot.vercel.app/connect-extension`. Sign in there if needed; the page creates a separate session for the extension and hands it over. Close the tab and open the extension.
 - **Username and password**: for accounts that have a password.
 
 ## Usage
@@ -39,7 +39,7 @@ Draft LinkedIn connection requests, referral asks, recruiter replies and follow-
 | `activeTab`, `scripting` | Read the open LinkedIn profile (name, headline) when you click the icon. |
 | `storage` | Keep your sign-in tokens in the extension's local storage. |
 | `https://connectpilot-api.onrender.com/*` | Call the ConnectPilot API. |
-| Content script on `li-copilot.vercel.app/connect-extension` | Receive the sign-in from the web app. It runs on no other page. |
+| Content script on `connect-pilot.vercel.app/connect-extension` | Receive the sign-in from the web app. It runs on no other page. |
 
 `http://localhost:8001/*` and `http://localhost:3000/connect-extension*` are included for local development.
 
@@ -68,10 +68,10 @@ The zip contains only the runtime files and is ready for the Chrome Web Store.
 
 ## Web app
 
-[li-copilot.vercel.app](https://li-copilot.vercel.app)
+[connect-pilot.vercel.app](https://connect-pilot.vercel.app)
 
 CI runs the tests and builds the package on every push; the zip is attached to each run as the `connectpilot-extension` artifact.
 
 ## Chrome Web Store
 
-`npm run package:store` builds `dist/connectpilot-extension-<version>-store.zip`, identical to the regular package except that the `localhost` development hosts are removed from the manifest. Listing text, permission justifications, privacy answers, reviewer notes and images are in [`store/`](store/LISTING.md). Regenerate the screenshots with `python3 store/tools/shots.py` (needs Python Playwright). Privacy policy: https://li-copilot.vercel.app/privacy
+`npm run package:store` builds `dist/connectpilot-extension-<version>-store.zip`, identical to the regular package except that the `localhost` development hosts are removed from the manifest. Listing text, permission justifications, privacy answers, reviewer notes and images are in [`store/`](store/LISTING.md). Regenerate the screenshots with `python3 store/tools/shots.py` (needs Python Playwright). Privacy policy: https://connect-pilot.vercel.app/privacy

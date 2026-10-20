@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import vm from "node:vm";
 
 const SOURCE = readFileSync(new URL("../connect.js", import.meta.url), "utf8");
-const ORIGIN = "https://li-copilot.vercel.app";
+const ORIGIN = "https://connect-pilot.vercel.app";
 const TOKEN = (name) => `eyJhbGciOiJIUzI1NiJ9.${name}payloadpayload.signaturesignature`;
 
 /** Runs connect.js against a fake page window and chrome.storage. */

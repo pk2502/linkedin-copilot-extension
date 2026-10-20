@@ -15,7 +15,7 @@ describe("store manifest", () => {
 
   it("keeps the production API and connect page", () => {
     assert.deepEqual(store.host_permissions, ["https://connectpilot-api.onrender.com/*"]);
-    assert.deepEqual(store.content_scripts[0].matches, ["https://li-copilot.vercel.app/connect-extension*"]);
+    assert.deepEqual(store.content_scripts[0].matches, ["https://connect-pilot.vercel.app/connect-extension*"]);
   });
 
   it("changes nothing else", () => {

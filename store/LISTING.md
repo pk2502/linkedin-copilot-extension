@@ -7,7 +7,7 @@ Everything needed to submit ConnectPilot to the Chrome Web Store, in the order t
 1. Google account with **2-Step Verification** turned on.
 2. Register at the [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole) and pay the one-time **US$5** fee.
 3. Verify the contact email: `paritoshkhubchandani2@gmail.com`.
-4. Create a **reviewer test account** on https://li-copilot.vercel.app/register (a throwaway username and strong password). Enter its credentials only in the dashboard's reviewer notes (section 6); never commit them.
+4. Create a **reviewer test account** on https://connect-pilot.vercel.app/register (a throwaway username and strong password). Enter its credentials only in the dashboard's reviewer notes (section 6); never commit them.
 5. Build the package: `npm run package:store` → `dist/connectpilot-extension-<version>-store.zip`. The store build drops the `localhost` development hosts from the manifest.
 
 ## 1. Package
@@ -60,7 +60,7 @@ Upload `dist/connectpilot-extension-<version>-store.zip`.
 
 Screenshots show the real popup rendered with fictional sample data (`store/tools/shots.py`); no real person's profile appears.
 
-**Website:** `https://li-copilot.vercel.app`
+**Website:** `https://connect-pilot.vercel.app`
 **Support email:** `paritoshkhubchandani2@gmail.com`
 
 ## 3. Privacy practices
@@ -77,7 +77,7 @@ Screenshots show the real popup rendered with fictional sample data (`store/tool
 | `scripting` | Runs a single read-only function in the active tab (granted by `activeTab`) that extracts the visible name, role and company. It does not modify the page. |
 | `storage` | Stores the user's ConnectPilot sign-in tokens in local extension storage so they stay signed in. |
 | Host `https://connectpilot-api.onrender.com/*` | The ConnectPilot API: sign-in, token refresh, sign-out and message generation. |
-| Content script on `https://li-copilot.vercel.app/connect-extension*` | Receives sign-in tokens from the ConnectPilot web app when the user chooses "Sign in with ConnectPilot" (same-origin, origin-checked message). Runs only on that one page of our own site. |
+| Content script on `https://connect-pilot.vercel.app/connect-extension*` | Receives sign-in tokens from the ConnectPilot web app when the user chooses "Sign in with ConnectPilot" (same-origin, origin-checked message). Runs only on that one page of our own site. |
 
 **Remote code:** No, the extension does not use remote code. All JavaScript is in the package.
 
@@ -94,7 +94,7 @@ Screenshots show the real popup rendered with fictional sample data (`store/tool
 - I do not use or transfer user data for purposes that are unrelated to my item's single purpose.
 - I do not use or transfer user data to determine creditworthiness or for lending purposes.
 
-**Privacy policy URL:** `https://li-copilot.vercel.app/privacy`
+**Privacy policy URL:** `https://connect-pilot.vercel.app/privacy`
 
 ## 4. Distribution
 
@@ -108,7 +108,7 @@ Screenshots show the real popup rendered with fictional sample data (`store/tool
 > 2. Sign in with the test account below (username and password fields under "or use your username").
 > 3. Open any LinkedIn profile page (https://www.linkedin.com/in/…) and click the icon again: the name, role and company are pre-filled from the page.
 > 4. Choose a message type and tone, click Generate Message, then Copy. Nothing is sent on LinkedIn; the user pastes the draft themselves.
-> 5. Optional: "Sign in with ConnectPilot" opens https://li-copilot.vercel.app/connect-extension, which signs the extension in through the web app.
+> 5. Optional: "Sign in with ConnectPilot" opens https://connect-pilot.vercel.app/connect-extension, which signs the extension in through the web app.
 >
 > Test account: username `<fill in>` / password `<fill in>`
 >
