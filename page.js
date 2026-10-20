@@ -53,6 +53,73 @@ export function readProfileSections(doc = document) {
 }
 
 /**
+ * The signed-in member's own profile, for importing into ConnectPilot.
+ * Returns null unless the page shows the owner's edit controls, so it never
+ * offers to import someone else's profile. Otherwise returns
+ * { headline, about, experience, education, skills }.
+ *
+ * Self-contained like every injected function, so the section reader is a
+ * copy of the one in readProfileSections with larger limits.
+ */
+export function readOwnProfile(doc) {
+  doc = doc || document;
+  const LIMITS = { headline: 150, about: 1500, experience: 3500, education: 500, skills: 500 };
+
+  const ownerSignals = [
+    'a[href*="/edit/intro/"]',
+    'a[href*="/edit/forms/intro/"]',
+    'a[href*="/add-edit/"]',
+    'button[aria-label="Add profile section"]',
+    '[aria-label^="Edit intro"]',
+  ];
+  const ownerButtonText = /^(add profile section|add section|open to|enhance profile)$/i;
+  const isOwn =
+    ownerSignals.some((selector) => doc.querySelector(selector)) ||
+    [...doc.querySelectorAll("main button")].some((b) => ownerButtonText.test(b.textContent.replace(/\s+/g, " ").trim()));
+  if (!isOwn) return null;
+
+  const clean = (text) => text.replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n").trim();
+  const cap = (text, max) => (text.length > max ? text.slice(0, max).trimEnd() : text);
+
+  function lines(anchorId) {
+    const section = doc.getElementById(anchorId)?.closest("section");
+    if (!section) return [];
+    const spans = [...section.querySelectorAll('span[aria-hidden="true"]')]
+      .map((el) => clean(el.textContent))
+      .filter(Boolean);
+    const unique = [];
+    for (const line of spans) if (line !== unique[unique.length - 1]) unique.push(line);
+    return unique;
+  }
+
+  function sectionText(anchorId, heading) {
+    const all = lines(anchorId);
+    if (all[0]?.toLowerCase() === heading.toLowerCase()) all.shift();
+    return all.join("\n");
+  }
+
+  // Skills list entries are interleaved with endorsement counts and links.
+  const noise = /endorse|^show all|^\d+\s|passed linkedin skill assessment|experiences? (at|across)/i;
+  const skills = [...new Set(lines("skills").filter((line) => line.toLowerCase() !== "skills" && !noise.test(line)))]
+    .filter((line) => line.length <= 60)
+    .join(", ");
+
+  const headlineEl =
+    doc.querySelector("main .pv-text-details__left-panel .text-body-medium") ||
+    doc.querySelector("main .text-body-medium.break-words") ||
+    doc.querySelector("main [data-generated-suggestion-target]");
+  const headline = headlineEl ? clean(headlineEl.textContent) : "";
+
+  return {
+    headline: cap(headline, LIMITS.headline),
+    about: cap(sectionText("about", "About"), LIMITS.about),
+    experience: cap(sectionText("experience", "Experience"), LIMITS.experience),
+    education: cap(sectionText("education", "Education"), LIMITS.education),
+    skills: cap(skills, LIMITS.skills),
+  };
+}
+
+/**
  * The open job on a LinkedIn job page (/jobs/view/... or the job panel in
  * search and collections). Returns { title, company, description } or null.
  */

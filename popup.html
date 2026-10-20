@@ -45,6 +45,21 @@
         <button id="clearContextBtn" class="chip-clear" title="Don't use page details">Clear</button>
       </div>
 
+      <div id="ownProfileBanner" class="notice job-banner" style="display:none;">
+        <div><strong>This is your profile.</strong> Import it so drafts know your background.</div>
+        <button id="reviewImportBtn" class="btn-secondary">Review import</button>
+      </div>
+      <div id="importPanel" class="import-panel" style="display:none;">
+        <p class="import-title">Will save to your ConnectPilot profile:</p>
+        <ul id="importList"></ul>
+        <label class="setting"><input type="checkbox" id="importReplace" /> Replace fields I already filled in</label>
+        <div class="import-actions">
+          <button id="saveImportBtn" class="btn-primary">Save to my profile</button>
+          <button id="cancelImportBtn" class="btn-ghost">Cancel</button>
+        </div>
+      </div>
+      <p id="importStatus" class="notice" style="display:none;"></p>
+
       <div id="jobBanner" class="notice job-banner" style="display:none;">
         <div><strong id="jobBannerTitle"></strong></div>
         <button id="useJobBtn" class="btn-secondary">Ask for a referral for this job</button>
@@ -54,6 +69,9 @@
         <button id="clearJobBtn" class="chip-clear" title="Remove this job">Remove</button>
       </div>
 
+      <p id="ownProfileHint" class="hint" style="display:none;">Open someone else's profile to draft a message to them.</p>
+
+      <div id="draftForm">
       <div class="form-group">
         <label for="genType">Message Type</label>
         <select id="genType">
@@ -64,6 +82,12 @@
         </select>
       </div>
 
+      <div id="draftSummary" class="draft-summary" style="display:none;">
+        <span id="draftSummaryText"></span>
+        <button id="editDetailsBtn" class="chip-clear">Edit details</button>
+      </div>
+
+      <div id="detailsSection">
       <!-- Connection Request Fields -->
       <div id="fields-connection_request" class="fields">
         <div class="form-group">
@@ -156,6 +180,8 @@
         </div>
       </div>
 
+      </div>
+
       <!-- Tone Selector -->
       <div class="tone-group">
         <label>Tone</label>
@@ -201,6 +227,12 @@
         <p class="hint"><span id="charCount">0</span> characters · you send it yourself</p>
         <p id="insertStatus" class="hint" style="display:none;"></p>
       </div>
+      </div>
+
+      <label class="setting footer-setting">
+        <input type="checkbox" id="autoDraftToggle" checked />
+        Auto-draft when I open ConnectPilot on a profile
+      </label>
     </div>
   </div>
 

@@ -37,12 +37,13 @@ with sync_playwright() as pw:
         h = p.evaluate("document.body.scrollHeight"); p.close(); return h
 
     def generate(p):
-        p.click("#generateBtn"); p.wait_for_selector("#outputSection", state="visible")
+        # Auto-draft writes the drafts as soon as the popup opens on a profile.
+        p.wait_for_selector("#outputSection", state="visible")
 
     shots = [
         ("screenshot-1-draft.png", "main", generate, "Draft LinkedIn messages in seconds",
-         "<p>Open ConnectPilot on a profile. It reads the visible details and finds what you have in common.</p>"
-         "<p>Get three drafts in your voice, tweak one, insert it into LinkedIn. You press Send yourself.</p>"),
+         "<p>Open ConnectPilot on a profile: three drafts in your voice are ready, using what you have in common.</p>"
+         "<p>Tweak one, insert it into LinkedIn and press Send yourself.</p>"),
         ("screenshot-2-signin.png", "signin", None, "Sign in your way",
          "<p>Use your ConnectPilot username and password, or sign in through the web app, including with Google.</p>"
          "<p>No automation: ConnectPilot never clicks or sends anything on LinkedIn.</p>"),

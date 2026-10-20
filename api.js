@@ -163,6 +163,11 @@ export function createApi({ storage, fetchImpl = (...args) => fetch(...args), ap
     return request("/api/profile/");
   }
 
+  /** Replace the whole profile: resolves to the saved profile. */
+  function saveProfile(fields) {
+    return request("/api/profile/", { method: "PUT", body: fields });
+  }
+
   /**
    * Sign out: clear local tokens first, then ask the backend to revoke this
    * extension's refresh token. Best-effort with a short timeout; an offline or
@@ -205,6 +210,7 @@ export function createApi({ storage, fetchImpl = (...args) => fetch(...args), ap
     draft,
     tweak,
     getProfile,
+    saveProfile,
     isSignedIn,
   };
 }

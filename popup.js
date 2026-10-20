@@ -7,8 +7,19 @@ import {
   isJobPage,
   isProfilePage,
   readJobPosting,
+  readOwnProfile,
   readProfileSections,
 } from "./page.js";
+import {
+  canAutoDraft,
+  draftCacheKey,
+  loadCachedDrafts,
+  loadSettings,
+  pickType,
+  profileFromPage,
+  saveCachedDrafts,
+  saveSettings,
+} from "./smart.js";
 
 const api = createApi({ storage: chrome.storage.local, apiBase: API_BASE });
 
@@ -40,12 +51,31 @@ const jobChip = document.getElementById("jobChip");
 const jobChipTitle = document.getElementById("jobChipTitle");
 const insertBtn = document.getElementById("insertBtn");
 const insertStatus = document.getElementById("insertStatus");
+const draftSummary = document.getElementById("draftSummary");
+const draftSummaryText = document.getElementById("draftSummaryText");
+const detailsSection = document.getElementById("detailsSection");
+const autoDraftToggle = document.getElementById("autoDraftToggle");
+const ownProfileBanner = document.getElementById("ownProfileBanner");
+const importPanel = document.getElementById("importPanel");
+const importList = document.getElementById("importList");
+const importReplace = document.getElementById("importReplace");
+const saveImportBtn = document.getElementById("saveImportBtn");
+const importStatus = document.getElementById("importStatus");
+
+// Drafts for the open profile are kept for this browser session, so reopening
+// the popup on the same page shows them again without using quota.
+const draftCache = chrome.storage.session;
 
 // Page context for the current draft. Sent to the API for the prompt only.
 let activeTabId = null;
 let recipientContext = "";
 let detectedJob = null;
 let pendingJob = null;
+let cacheKey = null;
+let ownProfile = null;
+let savedProfile = null;
+let detailsCollapsed = false;
+let settings = { autoDraft: true, tone: "formal" };
 
 const PROFILE_NUDGE_BELOW = 50;
 
@@ -58,14 +88,35 @@ let selectedTone = "formal";
 
 // --- Init ---
 document.addEventListener("DOMContentLoaded", async () => {
-  genTypeSelect.addEventListener("change", switchFields);
+  genTypeSelect.addEventListener("change", () => {
+    switchFields();
+    updateDetailsView();
+  });
+
+  settings = await loadSettings(chrome.storage.local).catch(() => settings);
+  setTone(settings.tone);
+  autoDraftToggle.checked = settings.autoDraft;
+  autoDraftToggle.addEventListener("change", async () => {
+    settings = await saveSettings(chrome.storage.local, { autoDraft: autoDraftToggle.checked });
+  });
 
   document.querySelectorAll(".tone-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".tone-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      selectedTone = btn.dataset.tone;
+      setTone(btn.dataset.tone);
+      saveSettings(chrome.storage.local, { tone: btn.dataset.tone }).catch(() => {});
     });
+  });
+
+  document.getElementById("editDetailsBtn").addEventListener("click", () => {
+    detailsCollapsed = false;
+    updateDetailsView();
+  });
+  document.getElementById("reviewImportBtn").addEventListener("click", reviewImport);
+  importReplace.addEventListener("change", renderImport);
+  saveImportBtn.addEventListener("click", saveImport);
+  document.getElementById("cancelImportBtn").addEventListener("click", () => {
+    importPanel.style.display = "none";
+    ownProfileBanner.style.display = "flex";
   });
 
   variantTabs.forEach((tab) => tab.addEventListener("click", () => selectVariant(Number(tab.dataset.variant))));
@@ -89,8 +140,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (await api.isSignedIn()) {
     showMain();
-    await loadProfileData();
     loadProfileNudge();
+    await loadProfileData();
   } else {
     showAuth();
   }
@@ -111,8 +162,8 @@ loginBtn.addEventListener("click", async () => {
     await api.login(username, password);
     document.getElementById("password").value = "";
     showMain();
-    await loadProfileData();
     loadProfileNudge();
+    await loadProfileData();
   } catch (e) {
     showAuthError(e instanceof ApiError ? e.message : "Sign-in failed. Check your connection.");
   } finally {
@@ -134,7 +185,9 @@ logoutBtn.addEventListener("click", async () => {
 });
 
 // --- Generate ---
-generateBtn.addEventListener("click", async () => {
+generateBtn.addEventListener("click", () => generateDrafts());
+
+async function generateDrafts() {
   const type = genTypeSelect.value;
   const payload = getPayload(type);
 
@@ -153,15 +206,24 @@ generateBtn.addEventListener("click", async () => {
   try {
     const data = await api.draft(type, payload);
     drafts = data.variants.map((text, variant) => ({ text, sourceId: data.id, variant }));
-    outputSection.style.display = "block";
-    selectVariant(0);
+    showDrafts(0);
+    cacheDrafts(type);
   } catch (e) {
     handleError(e);
   } finally {
-    generateBtn.textContent = "Generate 3 Drafts";
     generateBtn.disabled = false;
+    generateBtn.textContent = drafts.length ? "Generate 3 New Drafts" : "Generate 3 Drafts";
   }
-});
+}
+
+function showDrafts(index) {
+  outputSection.style.display = "block";
+  selectVariant(index);
+}
+
+function cacheDrafts(type) {
+  saveCachedDrafts(draftCache, cacheKey, { type, drafts, activeVariant }).catch(() => {});
+}
 
 function selectVariant(index) {
   activeVariant = index;
@@ -180,6 +242,7 @@ async function tweakActive(instruction) {
     const result = await api.tweak(current.sourceId, current.variant, instruction);
     drafts[activeVariant] = { text: result.text, sourceId: result.id, variant: 0 };
     selectVariant(activeVariant);
+    cacheDrafts(genTypeSelect.value);
   } catch (e) {
     handleError(e);
   } finally {
@@ -234,7 +297,13 @@ async function loadProfileData() {
       return;
     }
     if (!isProfilePage(tab.url)) return;
-    loadRecipientContext(tab.id);
+    cacheKey = draftCacheKey(tab.url);
+
+    const contextLoaded = loadRecipientContext(tab.id);
+    const ownLoaded = chrome.scripting
+      .executeScript({ target: { tabId: tab.id }, func: readOwnProfile, args: [null] })
+      .then(([result]) => result?.result ?? null)
+      .catch(() => null);
 
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -279,6 +348,18 @@ async function loadProfileData() {
     });
 
     const profile = results?.[0]?.result;
+
+    ownProfile = await ownLoaded;
+    if (ownProfile) {
+      // Your own profile: offer the import instead of drafting a message to yourself.
+      await contextLoaded;
+      contextChip.style.display = "none";
+      recipientContext = "";
+      ownProfileBanner.style.display = "flex";
+      document.getElementById("draftForm").style.display = "none";
+      document.getElementById("ownProfileHint").style.display = "block";
+      return;
+    }
     if (!profile?.isLinkedInProfile || !profile.name) return;
 
     profileBadge.style.display = "flex";
@@ -301,6 +382,25 @@ async function loadProfileData() {
     for (const [id, value] of Object.entries(fills)) {
       const el = document.getElementById(id);
       if (el && value) el.value = value;
+    }
+
+    const type = pickType({ page: "profile", company: profile.company, pendingJob });
+    if (type) {
+      genTypeSelect.value = type;
+      switchFields();
+      renderJobChip();
+    }
+    detailsCollapsed = canAutoDraft(genTypeSelect.value, readFields(genTypeSelect.value));
+    updateDetailsView();
+
+    await contextLoaded;
+    const cached = await loadCachedDrafts(draftCache, cacheKey, genTypeSelect.value).catch(() => null);
+    if (cached) {
+      drafts = cached.drafts;
+      showDrafts(cached.activeVariant ?? 0);
+      generateBtn.textContent = "Generate 3 New Drafts";
+    } else if (settings.autoDraft && detailsCollapsed) {
+      await generateDrafts();
     }
   } catch {
     // Not a profile page or LinkedIn's markup changed: leave fields for manual entry.
@@ -363,6 +463,66 @@ function renderJobChip() {
   }
 }
 
+// --- Import your own LinkedIn profile into ConnectPilot ---
+async function reviewImport() {
+  importStatus.style.display = "none";
+  try {
+    savedProfile = await api.getProfile();
+  } catch (e) {
+    if (e instanceof SessionExpiredError) return showAuth("Your session expired. Sign in again.");
+    importStatus.textContent = "Couldn't load your ConnectPilot profile. Try again.";
+    importStatus.style.display = "block";
+    return;
+  }
+  ownProfileBanner.style.display = "none";
+  importPanel.style.display = "block";
+  renderImport();
+}
+
+function renderImport() {
+  if (!ownProfile) return;
+  const { fields, changed } = profileFromPage(ownProfile, savedProfile, importReplace.checked);
+  importList.replaceChildren();
+  const keys = { Headline: "headline", Summary: "summary", Skills: "skills", Experience: "experience" };
+  for (const label of changed) {
+    const value = fields[keys[label]];
+    const li = document.createElement("li");
+    const strong = document.createElement("strong");
+    strong.textContent = `${label}: `;
+    li.append(strong, value.length > 70 ? `${value.slice(0, 70)}…` : value);
+    importList.append(li);
+  }
+  if (!changed.length) {
+    const li = document.createElement("li");
+    li.textContent = importReplace.checked
+      ? "Nothing to import from this page."
+      : "Your profile already has these fields. Tick the box to replace them.";
+    importList.append(li);
+  }
+  saveImportBtn.disabled = changed.length === 0;
+}
+
+async function saveImport() {
+  const { fields, changed } = profileFromPage(ownProfile, savedProfile, importReplace.checked);
+  if (!changed.length) return;
+  saveImportBtn.disabled = true;
+  saveImportBtn.textContent = "Saving...";
+  try {
+    const saved = await api.saveProfile(fields);
+    importPanel.style.display = "none";
+    importStatus.textContent = `Saved ${changed.join(", ").toLowerCase()}. Your profile is ${saved.completeness}% complete.`;
+    importStatus.style.display = "block";
+    if (saved.completeness >= PROFILE_NUDGE_BELOW) profileNudge.style.display = "none";
+  } catch (e) {
+    if (e instanceof SessionExpiredError) return showAuth("Your session expired. Sign in again.");
+    importStatus.textContent = "Couldn't save. Try again.";
+    importStatus.style.display = "block";
+  } finally {
+    saveImportBtn.disabled = false;
+    saveImportBtn.textContent = "Save to my profile";
+  }
+}
+
 // --- Insert into LinkedIn (types the draft; never sends) ---
 async function insertActiveDraft() {
   const text = outputText.value;
@@ -422,10 +582,42 @@ function showAuthError(msg) {
   authError.style.display = "block";
 }
 
+function setTone(tone) {
+  selectedTone = tone;
+  document.querySelectorAll(".tone-btn").forEach((b) => b.classList.toggle("active", b.dataset.tone === tone));
+}
+
+/** Collapse the form to a one-line summary while the page filled everything in. */
+function updateDetailsView() {
+  const type = genTypeSelect.value;
+  const fields = readFields(type);
+  const collapse = detailsCollapsed && canAutoDraft(type, fields);
+  detailsSection.style.display = collapse ? "none" : "block";
+  draftSummary.style.display = collapse ? "flex" : "none";
+  if (collapse) {
+    const where = [fields.role, fields.company].filter(Boolean).join(" at ");
+    const job = type === "referral_request" && fields.job_title ? ` · referral for ${fields.job_title}` : "";
+    draftSummaryText.textContent = `Drafting for ${fields.name}${where ? ` · ${where}` : ""}${job}`;
+  }
+}
+
 function switchFields() {
   document.querySelectorAll(".fields").forEach((f) => (f.style.display = "none"));
   const active = document.getElementById(`fields-${genTypeSelect.value}`);
   if (active) active.style.display = "block";
+}
+
+/** Current form values for a type, without validation. */
+function readFields(type) {
+  const value = (id) => document.getElementById(id)?.value.trim() ?? "";
+  switch (type) {
+    case "connection_request":
+      return { name: value("cr-name"), company: value("cr-company"), role: value("cr-role") };
+    case "referral_request":
+      return { name: value("rr-name"), company: value("rr-company"), role: value("rr-role"), job_title: value("rr-job") };
+    default:
+      return null;
+  }
 }
 
 function getPayload(type) {

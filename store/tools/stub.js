@@ -3,12 +3,16 @@
 (() => {
   const mode = new URLSearchParams(location.search).get("mode") || "main";
   const store = mode === "signin" ? {} : { access_token: "a.b.c", refresh_token: "d.e.f" };
+  const area = (data) => ({
+    get: async (keys) => Object.fromEntries([].concat(keys).filter((k) => k in data).map((k) => [k, data[k]])),
+    set: async (items) => Object.assign(data, items),
+    remove: async (keys) => [].concat(keys).forEach((k) => delete data[k]),
+  });
+  const session = {};
+  window.__stores = { local: store, session };
+  window.__draftCalls = 0;
   window.chrome = {
-    storage: { local: {
-      get: async (keys) => Object.fromEntries([].concat(keys).filter((k) => k in store).map((k) => [k, store[k]])),
-      set: async (items) => Object.assign(store, items),
-      remove: async (keys) => [].concat(keys).forEach((k) => delete store[k]),
-    } },
+    storage: { local: area(store), session: area(session) },
     tabs: {
       query: async () => [{
         id: 1,
@@ -28,6 +32,15 @@
             education: "",
           } }];
         }
+        if (name === "readOwnProfile") {
+          return [{ result: mode === "own" ? {
+            headline: "Lead Full-Stack Engineer",
+            about: "I build AI products end to end.",
+            experience: "Lead Engineer\nInspira\n2021 - Present",
+            education: "Mumbai University",
+            skills: "React, Django, TypeScript",
+          } : null }];
+        }
         if (name === "readJobPosting") {
           return [{ result: { title: "Staff Frontend Engineer", company: "Contoso Cloud", description: "7+ years React, design systems." } }];
         }
@@ -41,12 +54,20 @@
   };
   const reply = (body, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-  window.fetch = async (url) => {
+  window.fetch = async (url, init = {}) => {
     const path = new URL(url).pathname;
-    if (path === "/api/profile/") return reply({ completeness: 80 });
+    if (path === "/api/profile/" && init.method === "PUT") {
+      window.__savedProfile = JSON.parse(init.body);
+      return reply({ ...window.__savedProfile, completeness: 85 });
+    }
+    if (path === "/api/profile/") {
+      return reply({ headline: "", summary: "", skills: "", target_roles: "", experience: "", writing_sample: "", completeness: mode === "own" ? 20 : 80 });
+    }
     if (path.endsWith("/tweak/")) {
       return reply({ id: 2, text: "Hi Maya, I lead a React platform team and enjoyed your talk on scaling frontend teams. Would love to connect." }, 201);
     }
+    window.__draftCalls += 1;
+    window.__lastDraft = JSON.parse(init.body || "{}");
     return reply({
       id: 1,
       variants: [

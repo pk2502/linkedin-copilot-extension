@@ -276,6 +276,17 @@ describe("drafts", () => {
     assert.equal(fetchImpl.calls[0].init.method, "GET");
   });
 
+  it("saves the whole profile with PUT", async () => {
+    const storage = memoryStorage({ access_token: "a1", refresh_token: "r1" });
+    const fetchImpl = fakeFetch(() => json(200, { completeness: 80 }));
+    const api = createApi({ storage, fetchImpl, apiBase: API });
+
+    assert.equal((await api.saveProfile({ headline: "Lead" })).completeness, 80);
+    assert.equal(fetchImpl.calls[0].url, `${API}/api/profile/`);
+    assert.equal(fetchImpl.calls[0].init.method, "PUT");
+    assert.deepEqual(JSON.parse(fetchImpl.calls[0].init.body), { headline: "Lead" });
+  });
+
   it("surfaces the backend hint when a background is missing", async () => {
     const storage = memoryStorage({ access_token: "a1", refresh_token: "r1" });
     const hint = "Add your background here or fill in your profile first.";

@@ -26,7 +26,7 @@ Upload `dist/connectpilot-extension-<version>-store.zip`.
 
 > ConnectPilot writes first drafts of LinkedIn messages so you can reach out faster, in your own voice.
 >
-> Add your background to your ConnectPilot profile once. Then open ConnectPilot while viewing a LinkedIn profile: it reads the person's name, role, company and the visible About, experience and education sections, finds genuine common ground, and writes three drafts in your voice, each from a different angle. On a job posting, save the job and ConnectPilot tailors your referral ask to it. Make one shorter, warmer, more specific or more formal with a click, copy it, and send it yourself.
+> Set up in one click: open ConnectPilot on your own LinkedIn profile and import it, or upload your resume on the web app. Then open ConnectPilot while viewing someone's profile: it reads their name, role, company and the visible About, experience and education sections, finds genuine common ground, and has three drafts in your voice ready, each from a different angle. On a job posting, save the job and ConnectPilot tailors your referral ask to it. Make one shorter, warmer, more specific or more formal with a click, copy it, and send it yourself.
 >
 > Four message types:
 > • Connection requests that explain why you want to connect
@@ -38,7 +38,7 @@ Upload `dist/connectpilot-extension-<version>-store.zip`.
 >
 > You stay in control:
 > • ConnectPilot only drafts. It never sends messages, clicks buttons or automates anything on LinkedIn.
-> • It reads the profile or job you are viewing only when you open the extension, shows you what it read, and sends nothing until you click Generate.
+> • It reads the profile or job you are viewing only when you open the extension and shows you what it read. Auto-draft (on by default) writes drafts as soon as you open it on a profile; switch it off to send nothing until you click Generate.
 > • Insert types the draft into LinkedIn's message box for you to review. It never presses Send.
 > • Your drafts are saved to your private history on the ConnectPilot web app, where you can search and delete them.
 >
@@ -74,9 +74,9 @@ Screenshots show the real popup rendered with fictional sample data (`store/tool
 
 | Permission | Justification |
 | --- | --- |
-| `activeTab` | When the user opens the popup, grants temporary access to the current LinkedIn tab only: on a profile, to read the visible name, role, company, About, experience and education; on a job page, to read the job title, company and description; and, when the user clicks Insert, to type the chosen draft into the message box they have open. No access to other tabs or in the background. |
+| `activeTab` | When the user opens the popup, grants temporary access to the current LinkedIn tab only: on a profile, to read the visible name, role, company, About, experience and education; on the user's own profile, to read their headline, About, experience, education and skills for an import they confirm; on a job page, to read the job title, company and description; and, when the user clicks Insert, to type the chosen draft into the message box they have open. No access to other tabs or in the background. |
 | `scripting` | Runs functions in the active tab (granted by `activeTab`): read-only functions that extract the profile or job text listed above, and, only when the user clicks Insert, one that types the draft into the open LinkedIn message or invitation-note field. It never clicks buttons or sends anything. |
-| `storage` | Stores the user's ConnectPilot sign-in tokens in local extension storage so they stay signed in. |
+| `storage` | Stores the user's ConnectPilot sign-in tokens, settings (auto-draft, tone) and a saved job (24 hours) in local extension storage, and the current drafts per profile in session storage (cleared when Chrome closes) so reopening the popup does not generate them again. |
 | Host `https://connectpilot-api.onrender.com/*` | The ConnectPilot API: sign-in, token refresh, sign-out and message generation. |
 | Content script on `https://connect-pilot.vercel.app/connect-extension*` | Receives sign-in tokens from the ConnectPilot web app when the user chooses "Sign in with ConnectPilot" (same-origin, origin-checked message). Runs only on that one page of our own site. |
 
@@ -86,7 +86,7 @@ Screenshots show the real popup rendered with fictional sample data (`store/tool
 
 - **Personally identifiable information:** yes. The user's account username and email for sign-in; names of people the user writes to (from the profile or typed in).
 - **Authentication information:** yes. Sign-in tokens stored locally; credentials sent to our API to sign in.
-- **Website content:** yes. Name, role, company, About, experience and education read from the LinkedIn profile the user is viewing, and the title, company and description of a job posting the user is viewing, only when the popup is opened. Used to write the draft; the About, experience, education and job description text is not stored.
+- **Website content:** yes. Name, role, company, About, experience and education read from the LinkedIn profile the user is viewing, and the title, company and description of a job posting the user is viewing, only when the popup is opened. Used to write the draft; the About, experience, education and job description text is not stored. On the user's own profile, the headline, About, experience, education and skills are saved to their ConnectPilot profile only when they confirm the import.
 - **User activity / web history / location / financial / health / personal communications:** no.
 
 **Certifications** (all three are true; tick them):
@@ -107,8 +107,8 @@ Screenshots show the real popup rendered with fictional sample data (`store/tool
 
 > 1. Install the extension and click the ConnectPilot toolbar icon.
 > 2. Sign in with the test account below (username and password fields under "or use your username").
-> 3. Open any LinkedIn profile page (https://www.linkedin.com/in/…) and click the icon again: the name, role and company are pre-filled from the page.
-> 4. Choose a message type and tone, click Generate 3 Drafts, then Copy or Insert. Insert types the draft into an open LinkedIn message box; nothing is ever sent by the extension.
+> 3. Open any LinkedIn profile page (https://www.linkedin.com/in/…) and click the icon again: the name, role and company are read from the page and three drafts are written automatically (untick "Auto-draft" at the bottom to turn this off).
+> 4. Pick an option, optionally tweak it or change the tone and click Generate 3 New Drafts, then Copy or Insert. Insert types the draft into an open LinkedIn message box; nothing is ever sent by the extension.
 > 5. Optional: "Sign in with ConnectPilot" opens https://connect-pilot.vercel.app/connect-extension, which signs the extension in through the web app.
 >
 > Test account: username `<fill in>` / password `<fill in>`
