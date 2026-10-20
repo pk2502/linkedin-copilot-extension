@@ -120,6 +120,65 @@ export function readOwnProfile(doc) {
 }
 
 /**
+ * The LinkedIn conversation the user has open: the full messaging page or a
+ * chat bubble. Returns null when none is open, otherwise
+ * { name, headline, messages: [{ from: "them" | "me", name, date, time, text }] }
+ * with the most recent messages last (at most 12).
+ */
+export function readConversation(doc) {
+  doc = doc || document;
+  const clean = (text) => (text || "").replace(/\s+/g, " ").trim();
+  const firstText = (root, selectors) => {
+    for (const selector of selectors) {
+      const text = clean(root.querySelector(selector)?.textContent);
+      if (text) return text;
+    }
+    return "";
+  };
+
+  const scopes = [...doc.querySelectorAll(".msg-overlay-conversation-bubble, .msg-convo-wrapper, .msg-thread")].filter(
+    (el) => el.querySelector(".msg-s-event-listitem")
+  );
+  if (!scopes.length) return null;
+  // The conversation the user is typing in, else the last one opened.
+  const active = doc.activeElement;
+  const scope = scopes.find((el) => active && el.contains(active)) || scopes[scopes.length - 1];
+
+  const name = firstText(scope, [
+    ".msg-entity-lockup__entity-title",
+    ".msg-overlay-bubble-header__title",
+    ".msg-thread__link-to-profile .t-bold",
+    "h2",
+  ]);
+  const headline = firstText(scope, [".msg-entity-lockup__entity-info", ".msg-thread__link-to-profile .t-12"]);
+
+  const items = [...scope.querySelectorAll(".msg-s-event-listitem")];
+  // Some layouts don't mark the other person's messages; then go by sender name.
+  const marked = items.some((el) => el.classList.contains("msg-s-event-listitem--other"));
+
+  const messages = [];
+  let date = "";
+  let sender = "";
+  let time = "";
+  for (const event of scope.querySelectorAll(".msg-s-message-list__event")) {
+    date = clean(event.querySelector(".msg-s-message-list__time-heading")?.textContent) || date;
+    const meta = event.querySelector(".msg-s-message-group__meta");
+    if (meta) {
+      sender = clean(meta.querySelector(".msg-s-message-group__name")?.textContent) || sender;
+      time = clean(meta.querySelector(".msg-s-message-group__timestamp")?.textContent) || time;
+    }
+    for (const item of event.querySelectorAll(".msg-s-event-listitem")) {
+      const text = clean(item.querySelector(".msg-s-event-listitem__body")?.textContent);
+      if (!text) continue;
+      const fromThem = marked ? item.classList.contains("msg-s-event-listitem--other") : sender === name;
+      messages.push({ from: fromThem ? "them" : "me", name: sender, date, time, text: text.slice(0, 1500) });
+    }
+  }
+  if (!messages.length) return null;
+  return { name, headline, messages: messages.slice(-12) };
+}
+
+/**
  * The open job on a LinkedIn job page (/jobs/view/... or the job panel in
  * search and collections). Returns { title, company, description } or null.
  */
@@ -223,6 +282,30 @@ export function formatRecipientContext(sections, max = 4000) {
   if (sections?.education) parts.push(`Education:\n${sections.education}`);
   const text = parts.join("\n\n");
   return text.length > max ? text.slice(0, max) : text;
+}
+
+/**
+ * Conversation text sent to the API: one line per message, oldest first.
+ * The oldest messages are dropped first when it is too long.
+ */
+export function formatConversation(conversation, max = 4000) {
+  const lines = (conversation?.messages || []).map((m) => {
+    const who = m.from === "them" ? `${m.name || conversation.name || "Them"} (them)` : `${m.name || "Me"} (me)`;
+    const when = [m.date, m.time].filter(Boolean).join(" ");
+    return `${who}${when ? `, ${when}` : ""}: ${m.text}`;
+  });
+  while (lines.length > 1 && lines.join("\n").length > max) lines.shift();
+  return lines.join("\n").slice(-max);
+}
+
+/** True for LinkedIn messaging pages. */
+export function isMessagingPage(url) {
+  try {
+    const { hostname, pathname } = new URL(url);
+    return hostname.endsWith("linkedin.com") && pathname.startsWith("/messaging/");
+  } catch {
+    return false;
+  }
 }
 
 /** True for LinkedIn pages that show a single job posting. */

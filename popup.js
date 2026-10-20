@@ -6,6 +6,9 @@ import {
   insertIntoLinkedIn,
   isJobPage,
   isProfilePage,
+  formatConversation,
+  isMessagingPage,
+  readConversation,
   readJobPosting,
   readOwnProfile,
   readProfileSections,
@@ -15,10 +18,13 @@ import {
   draftCacheKey,
   loadCachedDrafts,
   loadSettings,
+  pickThreadType,
   pickType,
   profileFromPage,
   saveCachedDrafts,
   saveSettings,
+  splitHeadline,
+  threadCacheKey,
 } from "./smart.js";
 
 const api = createApi({ storage: chrome.storage.local, apiBase: API_BASE });
@@ -61,6 +67,9 @@ const importList = document.getElementById("importList");
 const importReplace = document.getElementById("importReplace");
 const saveImportBtn = document.getElementById("saveImportBtn");
 const importStatus = document.getElementById("importStatus");
+const threadChip = document.getElementById("threadChip");
+const threadSummary = document.getElementById("threadSummary");
+const interestRow = document.getElementById("interestRow");
 
 // Drafts for the open profile are kept for this browser session, so reopening
 // the popup on the same page shows them again without using quota.
@@ -75,6 +84,10 @@ let cacheKey = null;
 let ownProfile = null;
 let savedProfile = null;
 let detailsCollapsed = false;
+// Recent messages of the open LinkedIn conversation, for replies and follow-ups.
+let conversation = null;
+let conversationText = "";
+const THREAD_TYPES = ["recruiter_reply", "followup"];
 let settings = { autoDraft: true, tone: "formal" };
 
 const PROFILE_NUDGE_BELOW = 50;
@@ -104,6 +117,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     btn.addEventListener("click", () => {
       setTone(btn.dataset.tone);
       saveSettings(chrome.storage.local, { tone: btn.dataset.tone }).catch(() => {});
+    });
+  });
+
+  document.getElementById("clearThreadBtn").addEventListener("click", () => {
+    conversationText = "";
+    threadChip.style.display = "none";
+    detailsCollapsed = false;
+    updateDetailsView();
+  });
+  interestRow.querySelectorAll("[data-interest]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.getElementById("rec-interest").value = btn.dataset.interest;
+      interestRow.querySelectorAll("[data-interest]").forEach((b) => b.classList.toggle("active", b === btn));
+      generateDrafts();
     });
   });
 
@@ -196,6 +223,7 @@ async function generateDrafts() {
   payload.tone = selectedTone;
   if (recipientContext) payload.recipient_context = recipientContext;
   if (type === "referral_request" && pendingJob) payload.job_description = jobDescriptionFor(pendingJob);
+  if (THREAD_TYPES.includes(type) && conversationText) payload.conversation = conversationText;
 
   genError.style.display = "none";
   outputSection.style.display = "none";
@@ -213,6 +241,7 @@ async function generateDrafts() {
   } finally {
     generateBtn.disabled = false;
     generateBtn.textContent = drafts.length ? "Generate 3 New Drafts" : "Generate 3 Drafts";
+    updateDetailsView();
   }
 }
 
@@ -296,7 +325,10 @@ async function loadProfileData() {
       await loadJobPosting(tab.id);
       return;
     }
-    if (!isProfilePage(tab.url)) return;
+    if (!isProfilePage(tab.url)) {
+      await loadConversation(tab);
+      return;
+    }
     cacheKey = draftCacheKey(tab.url);
 
     const contextLoaded = loadRecipientContext(tab.id);
@@ -404,6 +436,52 @@ async function loadProfileData() {
     }
   } catch {
     // Not a profile page or LinkedIn's markup changed: leave fields for manual entry.
+  }
+}
+
+// --- Conversations: reply or follow up using the open LinkedIn thread ---
+async function loadConversation(tab) {
+  let found = null;
+  try {
+    const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: readConversation, args: [null] });
+    found = result?.result ?? null;
+  } catch {
+    // No readable conversation on this page.
+  }
+  if (!found?.name) {
+    if (isMessagingPage(tab.url)) showGenError("Open a conversation to draft a reply.");
+    return;
+  }
+  conversation = found;
+  conversationText = formatConversation(found);
+
+  const theirs = found.messages.filter((m) => m.from === "them").length;
+  threadSummary.textContent = `Using conversation with ${found.name}: ${found.messages.length} messages (${theirs} from them)`;
+  threadChip.style.display = "flex";
+
+  const type = pickThreadType(found);
+  genTypeSelect.value = type;
+  switchFields();
+  const { role, company } = splitHeadline(found.headline);
+  const fills = { "rec-name": found.name, "rec-company": company, "fu-name": found.name, "fu-company": company, "fu-role": role };
+  for (const [id, value] of Object.entries(fills)) {
+    const el = document.getElementById(id);
+    if (el && value && !el.value) el.value = value;
+  }
+  profileBadge.style.display = "flex";
+  profileName.textContent = found.name;
+
+  cacheKey = threadCacheKey(tab.url, found);
+  detailsCollapsed = true;
+  updateDetailsView();
+
+  const cached = await loadCachedDrafts(draftCache, cacheKey, type).catch(() => null);
+  if (cached) {
+    drafts = cached.drafts;
+    showDrafts(cached.activeVariant ?? 0);
+    generateBtn.textContent = "Generate 3 New Drafts";
+  } else if (settings.autoDraft && canAutoDraft(type, readFields(type), { conversation: true })) {
+    await generateDrafts();
   }
 }
 
@@ -591,10 +669,17 @@ function setTone(tone) {
 function updateDetailsView() {
   const type = genTypeSelect.value;
   const fields = readFields(type);
-  const collapse = detailsCollapsed && canAutoDraft(type, fields);
+  const threaded = Boolean(conversationText) && THREAD_TYPES.includes(type);
+  const collapse = detailsCollapsed && (threaded ? Boolean(fields?.name) : canAutoDraft(type, fields));
   detailsSection.style.display = collapse ? "none" : "block";
   draftSummary.style.display = collapse ? "flex" : "none";
-  if (collapse) {
+  interestRow.style.display = threaded && type === "recruiter_reply" ? "block" : "none";
+  generateBtn.style.display = threaded && type === "recruiter_reply" && !drafts.length ? "none" : "block";
+  if (collapse && threaded) {
+    const count = conversation?.messages.length ?? 0;
+    const what = type === "recruiter_reply" ? "Replying to recruiter" : "Replying to";
+    draftSummaryText.textContent = `${what} ${fields.name} · ${count} messages`;
+  } else if (collapse) {
     const where = [fields.role, fields.company].filter(Boolean).join(" at ");
     const job = type === "referral_request" && fields.job_title ? ` · referral for ${fields.job_title}` : "";
     draftSummaryText.textContent = `Drafting for ${fields.name}${where ? ` · ${where}` : ""}${job}`;
@@ -615,6 +700,10 @@ function readFields(type) {
       return { name: value("cr-name"), company: value("cr-company"), role: value("cr-role") };
     case "referral_request":
       return { name: value("rr-name"), company: value("rr-company"), role: value("rr-role"), job_title: value("rr-job") };
+    case "recruiter_reply":
+      return { name: value("rec-name"), company: value("rec-company"), job_title: value("rec-job") };
+    case "followup":
+      return { name: value("fu-name"), company: value("fu-company"), role: value("fu-role") };
     default:
       return null;
   }
@@ -644,7 +733,8 @@ function getPayload(type) {
       const job_title = document.getElementById("rec-job").value.trim();
       const your_background = document.getElementById("rec-background").value.trim();
       const interest_level = document.getElementById("rec-interest").value;
-      if (!recruiter_name || !company || !job_title) { showGenError("Fill in all required fields."); return null; }
+      const missing = conversationText ? !recruiter_name : !recruiter_name || !company || !job_title;
+      if (missing) { showGenError("Fill in all required fields."); return null; }
       return { recruiter_name, company, job_title, your_background, interest_level };
     }
     case "followup": {
@@ -653,6 +743,10 @@ function getPayload(type) {
       const role = document.getElementById("fu-role").value.trim();
       const context = document.getElementById("fu-context").value.trim();
       const days_since = document.getElementById("fu-days").value.trim();
+      if (conversationText) {
+        if (!name) { showGenError("Fill in their name."); return null; }
+        return { name, company, role, context, ...(days_since ? { days_since } : {}) };
+      }
       if (!name || !company || !role || !context || !days_since) { showGenError("Fill in all fields."); return null; }
       return { name, company, role, context, days_since };
     }

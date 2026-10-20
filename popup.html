@@ -45,6 +45,11 @@
         <button id="clearContextBtn" class="chip-clear" title="Don't use page details">Clear</button>
       </div>
 
+      <div id="threadChip" class="context-chip" style="display:none;">
+        <span id="threadSummary"></span>
+        <button id="clearThreadBtn" class="chip-clear" title="Don't use this conversation">Clear</button>
+      </div>
+
       <div id="ownProfileBanner" class="notice job-banner" style="display:none;">
         <div><strong>This is your profile.</strong> Import it so drafts know your background.</div>
         <button id="reviewImportBtn" class="btn-secondary">Review import</button>
@@ -201,6 +206,15 @@
         </div>
       </div>
 
+      <div id="interestRow" class="interest-row" style="display:none;">
+        <span>How interested are you?</span>
+        <div class="interest-buttons">
+          <button class="tweak-btn" data-interest="very interested">Interested</button>
+          <button class="tweak-btn" data-interest="somewhat interested">Maybe</button>
+          <button class="tweak-btn" data-interest="not interested">Not interested</button>
+        </div>
+      </div>
+
       <p id="genError" class="error" style="display:none;"></p>
       <button id="generateBtn" class="btn-primary">Generate 3 Drafts</button>
 
@@ -231,7 +245,7 @@
 
       <label class="setting footer-setting">
         <input type="checkbox" id="autoDraftToggle" checked />
-        Auto-draft when I open ConnectPilot on a profile
+        Auto-draft when I open ConnectPilot on a profile or conversation
       </label>
     </div>
   </div>

@@ -18,7 +18,9 @@
         id: 1,
         url: mode === "job"
           ? "https://www.linkedin.com/jobs/view/4012345678/"
-          : "https://www.linkedin.com/in/sample-profile/",
+          : mode === "recruiter" || mode === "thread"
+            ? "https://www.linkedin.com/messaging/thread/2-abc123/"
+            : "https://www.linkedin.com/in/sample-profile/",
       }],
       create: () => {},
     },
@@ -40,6 +42,20 @@
             education: "Mumbai University",
             skills: "React, Django, TypeScript",
           } : null }];
+        }
+        if (name === "readConversation") {
+          const recruiter = [
+            { from: "them", name: "Sam Lee", date: "Oct 14", time: "10:02 AM", text: "Hi Paritosh, we're hiring a Staff Engineer for our platform team. Open to a quick call?" },
+            { from: "me", name: "Paritosh K", date: "Oct 14", time: "11:15 AM", text: "Thanks Sam! Could you share the job description?" },
+            { from: "them", name: "Sam Lee", date: "Today", time: "9:40 AM", text: "Sure, attached. Remote-friendly. Free Thursday?" },
+          ];
+          const friend = [
+            { from: "them", name: "Maya Chen", date: "Oct 2", time: "6:10 PM", text: "Great meeting you at React Conf! Let's stay in touch." },
+            { from: "me", name: "Paritosh K", date: "Oct 3", time: "9:00 AM", text: "Likewise Maya, loved your talk on design systems." },
+          ];
+          if (mode === "recruiter") return [{ result: { name: "Sam Lee", headline: "Technical Recruiter at Acme Cloud", messages: recruiter } }];
+          if (mode === "thread") return [{ result: { name: "Maya Chen", headline: "Engineering Manager at Northwind Labs", messages: friend } }];
+          return [{ result: null }];
         }
         if (name === "readJobPosting") {
           return [{ result: { title: "Staff Frontend Engineer", company: "Contoso Cloud", description: "7+ years React, design systems." } }];
