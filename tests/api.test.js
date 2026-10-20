@@ -136,7 +136,7 @@ describe("generate", () => {
     const error = await api.generate("connection-request", payload).catch((e) => e);
 
     assert.equal(error.status, 429);
-    assert.equal(errorMessage(error), "Daily limit reached (20 messages per day). Try again tomorrow.");
+    assert.equal(errorMessage(error), "Daily limit reached. Try again tomorrow.");
   });
 
   it("requires a stored access token", async () => {
@@ -234,5 +234,70 @@ describe("logout", () => {
 describe("errorMessage for provider failures", () => {
   it("maps 502 to a retry message", () => {
     assert.equal(errorMessage(new ApiError(502, "x")), "AI service is busy. Try again in a moment.");
+  });
+});
+
+describe("drafts", () => {
+  const DRAFTS_URL = `${API}/api/drafts/`;
+
+  it("requests three drafts with the type in the body", async () => {
+    const storage = memoryStorage({ access_token: "a1", refresh_token: "r1" });
+    const fetchImpl = fakeFetch(() => json(201, { id: 5, variants: ["a", "b", "c"] }));
+    const api = createApi({ storage, fetchImpl, apiBase: API });
+
+    const result = await api.draft("connection_request", { name: "Priya", tone: "formal" });
+
+    assert.deepEqual(result, { id: 5, variants: ["a", "b", "c"] });
+    assert.equal(fetchImpl.calls[0].url, DRAFTS_URL);
+    assert.equal(fetchImpl.calls[0].init.method, "POST");
+    assert.deepEqual(fetchImpl.calls[0].body, { type: "connection_request", name: "Priya", tone: "formal" });
+    assert.equal(fetchImpl.calls[0].auth, "Bearer a1");
+  });
+
+  it("tweaks a variant", async () => {
+    const storage = memoryStorage({ access_token: "a1", refresh_token: "r1" });
+    const fetchImpl = fakeFetch(() => json(201, { id: 6, text: "Shorter." }));
+    const api = createApi({ storage, fetchImpl, apiBase: API });
+
+    const result = await api.tweak(5, 1, "shorter");
+
+    assert.equal(result.text, "Shorter.");
+    assert.equal(fetchImpl.calls[0].url, `${API}/api/drafts/5/tweak/`);
+    assert.deepEqual(fetchImpl.calls[0].body, { variant: 1, instruction: "shorter" });
+  });
+
+  it("loads the profile", async () => {
+    const storage = memoryStorage({ access_token: "a1", refresh_token: "r1" });
+    const fetchImpl = fakeFetch(() => json(200, { completeness: 65 }));
+    const api = createApi({ storage, fetchImpl, apiBase: API });
+
+    assert.equal((await api.getProfile()).completeness, 65);
+    assert.equal(fetchImpl.calls[0].url, `${API}/api/profile/`);
+    assert.equal(fetchImpl.calls[0].init.method, "GET");
+  });
+
+  it("surfaces the backend hint when a background is missing", async () => {
+    const storage = memoryStorage({ access_token: "a1", refresh_token: "r1" });
+    const hint = "Add your background here or fill in your profile first.";
+    const fetchImpl = fakeFetch(() => json(400, { your_background: [hint] }));
+    const api = createApi({ storage, fetchImpl, apiBase: API });
+
+    const error = await api.draft("referral_request", {}).catch((e) => e);
+
+    assert.equal(error.status, 400);
+    assert.equal(errorMessage(error), hint);
+  });
+
+  it("keeps the generic 400 message for other validation errors and non-JSON bodies", async () => {
+    const storage = memoryStorage({ access_token: "a1", refresh_token: "r1" });
+    const api = createApi({
+      storage,
+      fetchImpl: fakeFetch(() => new Response("oops", { status: 400 })),
+      apiBase: API,
+    });
+
+    const error = await api.draft("connection_request", {}).catch((e) => e);
+
+    assert.equal(errorMessage(error), "Please check the fields and try again.");
   });
 });

@@ -9,6 +9,8 @@ Draft LinkedIn connection requests, referral asks, recruiter replies and follow-
 - 4 message types: Connection Request, Referral Request, Recruiter Reply, Follow-Up
 - 3 tones: Formal, Friendly, Concise
 - Auto-fills name, role and company from the LinkedIn profile you have open
+- Three drafts per request, each from a different angle, written with your saved ConnectPilot profile
+- One-click tweaks: shorter, warmer, more specific, more formal
 - One-click copy
 - Sign in with your ConnectPilot account, including accounts created with Google
 - Stays signed in: expired access tokens are refreshed automatically
@@ -29,7 +31,9 @@ Draft LinkedIn connection requests, referral asks, recruiter replies and follow-
 
 1. Open a LinkedIn profile.
 2. Click the ConnectPilot icon. Name, role and company are filled in when they can be read from the page.
-3. Choose a message type and tone, then **Generate Message**.
+3. Choose a message type and tone, then **Generate 3 Drafts**. Switch between the options, tweak one if needed, and copy it.
+
+Fill in your profile once at https://connect-pilot.vercel.app/dashboard/profile (the popup links to it while it is incomplete); drafts use it automatically.
 4. Review, **Copy**, and paste it into LinkedIn yourself.
 
 ## Permissions

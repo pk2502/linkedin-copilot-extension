@@ -12,7 +12,21 @@
     tabs: { query: async () => [{ id: 1, url: "https://www.linkedin.com/in/sample-profile/" }], create: () => {} },
     scripting: { executeScript: async () => [{ result: { isLinkedInProfile: true, name: "Maya Chen", role: "Engineering Manager", company: "Northwind Labs" } }] },
   };
-  window.fetch = async () => new Response(JSON.stringify({
-    message: "Hi Maya, I enjoyed your talk on scaling frontend teams at Northwind Labs. I lead a React platform team and would love to connect and swap notes on developer experience.",
-  }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const reply = (body, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  window.fetch = async (url) => {
+    const path = new URL(url).pathname;
+    if (path === "/api/profile/") return reply({ completeness: 80 });
+    if (path.endsWith("/tweak/")) {
+      return reply({ id: 2, text: "Hi Maya, I lead a React platform team and enjoyed your talk on scaling frontend teams. Would love to connect." }, 201);
+    }
+    return reply({
+      id: 1,
+      variants: [
+        "Hi Maya, I lead a React platform team and your talk on scaling frontend teams at Northwind Labs hit close to home. Would be glad to connect and swap notes on developer experience.",
+        "Hi Maya, your work growing the engineering org at Northwind Labs caught my attention. I build frontend platforms and would value being connected.",
+        "Hi Maya - React platform lead here. Would like to connect and follow your work at Northwind Labs.",
+      ],
+    }, 201);
+  };
 })();

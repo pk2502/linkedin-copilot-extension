@@ -16,10 +16,11 @@ export class SessionExpiredError extends Error {
 }
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, data = null) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -27,8 +28,11 @@ export class ApiError extends Error {
 export function errorMessage(error) {
   if (error instanceof SessionExpiredError) return null;
   if (error instanceof ApiError) {
-    if (error.status === 429) return "Daily limit reached (20 messages per day). Try again tomorrow.";
-    if (error.status === 400) return "Please check the fields and try again.";
+    if (error.status === 429) return "Daily limit reached. Try again tomorrow.";
+    if (error.status === 400) {
+      const hint = error.data?.your_background?.[0];
+      return typeof hint === "string" ? hint : "Please check the fields and try again.";
+    }
     if (error.status === 502) return "AI service is busy. Try again in a moment.";
   }
   return "Failed to generate. Try again.";
@@ -124,7 +128,10 @@ export function createApi({ storage, fetchImpl = (...args) => fetch(...args), ap
       }
     }
 
-    if (!response.ok) throw new ApiError(response.status, `Request failed (${response.status})`);
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new ApiError(response.status, `Request failed (${response.status})`, data);
+    }
     return response.status === 204 ? null : response.json();
   }
 
@@ -140,6 +147,20 @@ export function createApi({ storage, fetchImpl = (...args) => fetch(...args), ap
 
   function generate(endpoint, payload) {
     return request(`/api/generate/${endpoint}/`, { method: "POST", body: payload });
+  }
+
+  /** Three drafts in one request: resolves to {id, variants}. */
+  function draft(type, payload) {
+    return request("/api/drafts/", { method: "POST", body: { type, ...payload } });
+  }
+
+  /** Rewrite one variant: resolves to {id, text}. */
+  function tweak(id, variant, instruction) {
+    return request(`/api/drafts/${id}/tweak/`, { method: "POST", body: { variant, instruction } });
+  }
+
+  function getProfile() {
+    return request("/api/profile/");
   }
 
   /**
@@ -172,5 +193,18 @@ export function createApi({ storage, fetchImpl = (...args) => fetch(...args), ap
     return Boolean(access || refresh);
   }
 
-  return { getTokens, startSession, clearSession, refreshAccessToken, request, login, logout, generate, isSignedIn };
+  return {
+    getTokens,
+    startSession,
+    clearSession,
+    refreshAccessToken,
+    request,
+    login,
+    logout,
+    generate,
+    draft,
+    tweak,
+    getProfile,
+    isSignedIn,
+  };
 }

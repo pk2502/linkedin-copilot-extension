@@ -26,7 +26,7 @@ Upload `dist/connectpilot-extension-<version>-store.zip`.
 
 > ConnectPilot writes first drafts of LinkedIn messages so you can reach out faster, in your own voice.
 >
-> Open ConnectPilot while viewing a LinkedIn profile and it fills in the person's name, role and company from the page. Choose what you want to write, pick a tone, and generate a draft in seconds. Edit it, copy it, and send it yourself.
+> Add your background to your ConnectPilot profile once. Then open ConnectPilot while viewing a LinkedIn profile: it fills in the person's name, role and company from the page, and writes three drafts in your voice, each from a different angle. Make one shorter, warmer, more specific or more formal with a click, copy it, and send it yourself.
 >
 > Four message types:
 > • Connection requests that explain why you want to connect

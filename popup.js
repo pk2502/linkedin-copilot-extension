@@ -19,6 +19,17 @@ const outputText = document.getElementById("outputText");
 const profileBadge = document.getElementById("profileBadge");
 const profileName = document.getElementById("profileName");
 const genTypeSelect = document.getElementById("genType");
+const profileNudge = document.getElementById("profileNudge");
+const charCount = document.getElementById("charCount");
+const variantTabs = [...document.querySelectorAll(".variant-tab")];
+const tweakButtons = [...document.querySelectorAll(".tweak-btn")];
+
+const PROFILE_NUDGE_BELOW = 50;
+
+// Current drafts: one entry per option. A tweak replaces the option's text and
+// becomes the source for the next tweak of that option.
+let drafts = [];
+let activeVariant = 0;
 
 let selectedTone = "formal";
 
@@ -34,9 +45,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
+  variantTabs.forEach((tab) => tab.addEventListener("click", () => selectVariant(Number(tab.dataset.variant))));
+  tweakButtons.forEach((btn) => btn.addEventListener("click", () => tweakActive(btn.dataset.tweak)));
+  profileNudge.addEventListener("click", (event) => {
+    event.preventDefault();
+    chrome.tabs.create({ url: `${WEB_BASE}/dashboard/profile` });
+    window.close();
+  });
+
   if (await api.isSignedIn()) {
     showMain();
     await loadProfileData();
+    loadProfileNudge();
   } else {
     showAuth();
   }
@@ -58,6 +78,7 @@ loginBtn.addEventListener("click", async () => {
     document.getElementById("password").value = "";
     showMain();
     await loadProfileData();
+    loadProfileNudge();
   } catch (e) {
     showAuthError(e instanceof ApiError ? e.message : "Sign-in failed. Check your connection.");
   } finally {
@@ -89,24 +110,57 @@ generateBtn.addEventListener("click", async () => {
 
   genError.style.display = "none";
   outputSection.style.display = "none";
-  generateBtn.textContent = "Generating...";
+  generateBtn.textContent = "Writing 3 drafts...";
   generateBtn.disabled = true;
 
   try {
-    const data = await api.generate(getEndpoint(type), payload);
-    outputText.value = data.message;
+    const data = await api.draft(type, payload);
+    drafts = data.variants.map((text, variant) => ({ text, sourceId: data.id, variant }));
     outputSection.style.display = "block";
+    selectVariant(0);
   } catch (e) {
-    if (e instanceof SessionExpiredError) {
-      showAuth("Your session expired. Sign in again.");
-      return;
-    }
-    showGenError(errorMessage(e));
+    handleError(e);
   } finally {
-    generateBtn.textContent = "Generate Message";
+    generateBtn.textContent = "Generate 3 Drafts";
     generateBtn.disabled = false;
   }
 });
+
+function selectVariant(index) {
+  activeVariant = index;
+  variantTabs.forEach((tab, i) => tab.classList.toggle("active", i === index));
+  outputText.value = drafts[index]?.text ?? "";
+  charCount.textContent = String(outputText.value.length);
+}
+
+async function tweakActive(instruction) {
+  const current = drafts[activeVariant];
+  if (!current) return;
+
+  genError.style.display = "none";
+  setDraftControlsDisabled(true);
+  try {
+    const result = await api.tweak(current.sourceId, current.variant, instruction);
+    drafts[activeVariant] = { text: result.text, sourceId: result.id, variant: 0 };
+    selectVariant(activeVariant);
+  } catch (e) {
+    handleError(e);
+  } finally {
+    setDraftControlsDisabled(false);
+  }
+}
+
+function setDraftControlsDisabled(disabled) {
+  [...tweakButtons, ...variantTabs, generateBtn].forEach((el) => (el.disabled = disabled));
+}
+
+function handleError(e) {
+  if (e instanceof SessionExpiredError) {
+    showAuth("Your session expired. Sign in again.");
+    return;
+  }
+  showGenError(errorMessage(e));
+}
 
 // --- Copy ---
 copyBtn.addEventListener("click", () => {
@@ -114,6 +168,21 @@ copyBtn.addEventListener("click", () => {
   copyBtn.textContent = "Copied!";
   setTimeout(() => (copyBtn.textContent = "Copy"), 2000);
 });
+
+// --- Profile nudge: suggest completing the profile while it is thin ---
+async function loadProfileNudge() {
+  try {
+    const profile = await api.getProfile();
+    if (profile.completeness < PROFILE_NUDGE_BELOW) {
+      profileNudge.textContent = `Your profile is ${profile.completeness}% complete. Add it for drafts in your voice →`;
+      profileNudge.style.display = "block";
+    } else {
+      profileNudge.style.display = "none";
+    }
+  } catch {
+    // Optional hint: never block the popup on it.
+  }
+}
 
 // --- Profile extraction via scripting API (activeTab, granted when the popup opens) ---
 async function loadProfileData() {
@@ -226,10 +295,6 @@ function switchFields() {
   if (active) active.style.display = "block";
 }
 
-function getEndpoint(type) {
-  return type.replace(/_/g, "-");
-}
-
 function getPayload(type) {
   switch (type) {
     case "connection_request": {
@@ -245,7 +310,7 @@ function getPayload(type) {
       const role = document.getElementById("rr-role").value.trim();
       const job_title = document.getElementById("rr-job").value.trim();
       const your_background = document.getElementById("rr-background").value.trim();
-      if (!name || !company || !role || !job_title || !your_background) { showGenError("Fill in all fields."); return null; }
+      if (!name || !company || !role || !job_title) { showGenError("Fill in all required fields."); return null; }
       return { name, company, role, job_title, your_background };
     }
     case "recruiter_reply": {
@@ -254,7 +319,7 @@ function getPayload(type) {
       const job_title = document.getElementById("rec-job").value.trim();
       const your_background = document.getElementById("rec-background").value.trim();
       const interest_level = document.getElementById("rec-interest").value;
-      if (!recruiter_name || !company || !job_title || !your_background) { showGenError("Fill in all fields."); return null; }
+      if (!recruiter_name || !company || !job_title) { showGenError("Fill in all required fields."); return null; }
       return { recruiter_name, company, job_title, your_background, interest_level };
     }
     case "followup": {

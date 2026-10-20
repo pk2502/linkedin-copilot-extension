@@ -286,3 +286,68 @@ body {
   flex: 1;
   border-top: 1px solid #e5e5e5;
 }
+
+/* --- Drafts (1.3) --- */
+.optional {
+  font-weight: 400;
+  color: #888;
+}
+
+.nudge {
+  display: block;
+  text-decoration: none;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.nudge:hover {
+  border-color: #4f46e5;
+}
+
+.variant-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.variant-tab {
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 11px;
+  color: #444;
+  cursor: pointer;
+}
+
+.variant-tab.active {
+  background: #0f0f0f;
+  border-color: #0f0f0f;
+  color: #fff;
+}
+
+.tweak-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.tweak-btn {
+  padding: 3px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 11px;
+  color: #333;
+  cursor: pointer;
+}
+
+.tweak-btn:hover:not(:disabled) {
+  border-color: #4f46e5;
+}
+
+.tweak-btn:disabled,
+.variant-tab:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
