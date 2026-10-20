@@ -250,7 +250,7 @@ describe("drafts", () => {
     assert.deepEqual(result, { id: 5, variants: ["a", "b", "c"] });
     assert.equal(fetchImpl.calls[0].url, DRAFTS_URL);
     assert.equal(fetchImpl.calls[0].init.method, "POST");
-    assert.deepEqual(fetchImpl.calls[0].body, { type: "connection_request", name: "Priya", tone: "formal" });
+    assert.deepEqual(fetchImpl.calls[0].body, { type: "connection_request", name: "Priya", tone: "formal", client: "extension" });
     assert.equal(fetchImpl.calls[0].auth, "Bearer a1");
   });
 
@@ -263,7 +263,7 @@ describe("drafts", () => {
 
     assert.equal(result.text, "Shorter.");
     assert.equal(fetchImpl.calls[0].url, `${API}/api/drafts/5/tweak/`);
-    assert.deepEqual(fetchImpl.calls[0].body, { variant: 1, instruction: "shorter" });
+    assert.deepEqual(fetchImpl.calls[0].body, { variant: 1, instruction: "shorter", client: "extension" });
   });
 
   it("loads the profile", async () => {

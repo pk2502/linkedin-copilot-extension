@@ -151,12 +151,12 @@ export function createApi({ storage, fetchImpl = (...args) => fetch(...args), ap
 
   /** Three drafts in one request: resolves to {id, variants}. */
   function draft(type, payload) {
-    return request("/api/drafts/", { method: "POST", body: { type, ...payload } });
+    return request("/api/drafts/", { method: "POST", body: { type, ...payload, client: "extension" } });
   }
 
   /** Rewrite one variant: resolves to {id, text}. */
   function tweak(id, variant, instruction) {
-    return request(`/api/drafts/${id}/tweak/`, { method: "POST", body: { variant, instruction } });
+    return request(`/api/drafts/${id}/tweak/`, { method: "POST", body: { variant, instruction, client: "extension" } });
   }
 
   function getProfile() {
