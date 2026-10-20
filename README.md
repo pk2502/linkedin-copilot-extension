@@ -10,6 +10,7 @@ Draft LinkedIn connection requests, referral asks, recruiter replies and follow-
 - 3 tones: Formal, Friendly, Concise (the last one you used is remembered)
 - Auto-draft: on someone's profile, picks the message type (a referral when your saved job is at their company, otherwise a connection request), collapses the form to one line and writes three drafts as soon as you open the popup. Drafts are kept per profile until Chrome closes, so reopening the popup costs nothing. Turn it off with the checkbox at the bottom
 - Conversations: in a LinkedIn conversation (messaging page or chat bubble), reads the latest messages of that conversation and drafts your next message. A recruiter's message gets Interested / Maybe / Not interested buttons; anything else gets a follow-up drafted automatically. The messages are used for the draft only and are not stored
+- Outreach tracker: drafts file the person in your ConnectPilot tracker (by their profile URL), Insert marks them as sent, and opening a conversation where they wrote last marks them as replied. The popup shows where you stand ("Sent 6 days ago · follow-up due") and, when a follow-up is due, drafts one automatically. "Mark as sent" covers drafts you copied instead of inserting
 - Import your own profile: on your own LinkedIn profile, review and save your headline, About, experience, education and skills to your ConnectPilot profile
 - Auto-fills name, role and company from the LinkedIn profile you have open, and uses the visible About, experience and education sections to find genuine common ground (shown in the popup, with a Clear button)
 - On a LinkedIn job page: "Ask for a referral for this job" saves the job (for 24 hours, in the extension only) and tailors the referral ask to it
@@ -59,6 +60,7 @@ No build step. Edit the files and click **Reload** on `chrome://extensions`.
 - `connect.js`: content script for the web app sign-in hand-off.
 - `page.js`: functions injected into the LinkedIn tab (read profile sections, your own profile, job postings and the open conversation, insert a draft). Self-contained, read-only except Insert, never sends.
 - `job-store.js`: the job saved for a referral ask (local, 24 hours).
+- `tracker.js`: tracker labels, follow-up fields and profile-link helpers (no DOM).
 - `smart.js`: type picking, auto-draft rules, the per-profile draft cache, settings, and own-profile import mapping (no DOM).
 - `popup.html` / `popup.js` / `styles.css`: the popup UI.
 

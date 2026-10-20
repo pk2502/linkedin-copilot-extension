@@ -53,8 +53,8 @@
             { from: "them", name: "Maya Chen", date: "Oct 2", time: "6:10 PM", text: "Great meeting you at React Conf! Let's stay in touch." },
             { from: "me", name: "Paritosh K", date: "Oct 3", time: "9:00 AM", text: "Likewise Maya, loved your talk on design systems." },
           ];
-          if (mode === "recruiter") return [{ result: { name: "Sam Lee", headline: "Technical Recruiter at Acme Cloud", messages: recruiter } }];
-          if (mode === "thread") return [{ result: { name: "Maya Chen", headline: "Engineering Manager at Northwind Labs", messages: friend } }];
+          if (mode === "recruiter") return [{ result: { name: "Sam Lee", headline: "Technical Recruiter at Acme Cloud", profileHref: "/in/sam-lee/", messages: recruiter } }];
+          if (mode === "thread") return [{ result: { name: "Maya Chen", headline: "Engineering Manager at Northwind Labs", profileHref: "/in/maya-chen/", messages: friend } }];
           return [{ result: null }];
         }
         if (name === "readJobPosting") {
@@ -70,8 +70,27 @@
   };
   const reply = (body, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  window.__touches = [];
   window.fetch = async (url, init = {}) => {
     const path = new URL(url).pathname;
+    const contact = (fields) => ({
+      id: 7, name: "Maya Chen", company: "Northwind Labs", role: "Engineering Manager",
+      linkedin_url: "https://www.linkedin.com/in/sample-profile/", status: "drafted",
+      follow_up_due: false, days_since_sent: null, ...fields,
+    });
+    if (path === "/api/contacts/lookup/") {
+      if (mode === "due") return reply(contact({ status: "sent", follow_up_due: true, days_since_sent: 6 }));
+      if (mode === "recruiter") return reply(contact({ name: "Sam Lee", status: "sent", days_since_sent: 2 }));
+      if (window.__touches.some((t) => t.event === "sent")) return reply(contact({ status: "sent", days_since_sent: 0 }));
+      if (window.__draftCalls > 0) return reply(contact());
+      return reply({ detail: "Not found." }, 404);
+    }
+    if (path === "/api/contacts/touch/") {
+      const body = JSON.parse(init.body);
+      window.__touches.push(body);
+      if (body.event === "sent") return reply(contact({ status: "sent", days_since_sent: 0 }));
+      return reply(contact({ status: "replied" }));
+    }
     if (path === "/api/profile/" && init.method === "PUT") {
       window.__savedProfile = JSON.parse(init.body);
       return reply({ ...window.__savedProfile, completeness: 85 });
@@ -86,6 +105,7 @@
     window.__lastDraft = JSON.parse(init.body || "{}");
     return reply({
       id: 1,
+      contact_id: 7,
       variants: [
         "Hi Maya, I lead a React platform team and your talk on scaling frontend teams at Northwind Labs hit close to home. Would be glad to connect and swap notes on developer experience.",
         "Hi Maya, your work growing the engineering org at Northwind Labs caught my attention. I build frontend platforms and would value being connected.",

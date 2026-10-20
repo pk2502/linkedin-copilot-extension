@@ -1,5 +1,6 @@
 import { API_BASE, WEB_BASE } from "./config.js";
 import { ApiError, SessionExpiredError, createApi, errorMessage } from "./api.js";
+import { absoluteProfileUrl, followUpFields, trackerLabel } from "./tracker.js";
 import { clearPendingJob, jobDescriptionFor, loadPendingJob, savePendingJob } from "./job-store.js";
 import {
   formatRecipientContext,
@@ -70,6 +71,9 @@ const importStatus = document.getElementById("importStatus");
 const threadChip = document.getElementById("threadChip");
 const threadSummary = document.getElementById("threadSummary");
 const interestRow = document.getElementById("interestRow");
+const trackerChip = document.getElementById("trackerChip");
+const trackerText = document.getElementById("trackerText");
+const markSentBtn = document.getElementById("markSentBtn");
 
 // Drafts for the open profile are kept for this browser session, so reopening
 // the popup on the same page shows them again without using quota.
@@ -88,6 +92,10 @@ let detailsCollapsed = false;
 let conversation = null;
 let conversationText = "";
 const THREAD_TYPES = ["recruiter_reply", "followup"];
+// Outreach tracker: the person's profile URL and their tracker entry.
+let contactUrl = "";
+let contactDetails = { name: "", company: "", role: "" };
+let contact = null;
 let settings = { autoDraft: true, tone: "formal" };
 
 const PROFILE_NUDGE_BELOW = 50;
@@ -133,6 +141,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       generateDrafts();
     });
   });
+
+  markSentBtn.addEventListener("click", () => touchContact("sent"));
 
   document.getElementById("editDetailsBtn").addEventListener("click", () => {
     detailsCollapsed = false;
@@ -224,6 +234,7 @@ async function generateDrafts() {
   if (recipientContext) payload.recipient_context = recipientContext;
   if (type === "referral_request" && pendingJob) payload.job_description = jobDescriptionFor(pendingJob);
   if (THREAD_TYPES.includes(type) && conversationText) payload.conversation = conversationText;
+  if (contactUrl) payload.linkedin_url = contactUrl;
 
   genError.style.display = "none";
   outputSection.style.display = "none";
@@ -236,6 +247,7 @@ async function generateDrafts() {
     drafts = data.variants.map((text, variant) => ({ text, sourceId: data.id, variant }));
     showDrafts(0);
     cacheDrafts(type);
+    if (data.contact_id && contactUrl && !contact) refreshContact();
   } catch (e) {
     handleError(e);
   } finally {
@@ -416,7 +428,16 @@ async function loadProfileData() {
       if (el && value) el.value = value;
     }
 
-    const type = pickType({ page: "profile", company: profile.company, pendingJob });
+    contactUrl = tab.url;
+    contactDetails = { name: profile.name, company: profile.company, role: profile.role };
+    await refreshContact();
+    const followUp = followUpFields(contact);
+    if (followUp) {
+      document.getElementById("fu-context").value = followUp.context;
+      document.getElementById("fu-days").value = followUp.days_since;
+    }
+
+    const type = pickType({ page: "profile", company: profile.company, pendingJob, contact });
     if (type) {
       genTypeSelect.value = type;
       switchFields();
@@ -470,6 +491,14 @@ async function loadConversation(tab) {
   }
   profileBadge.style.display = "flex";
   profileName.textContent = found.name;
+
+  contactUrl = absoluteProfileUrl(found.profileHref);
+  contactDetails = { name: found.name, company, role };
+  if (contactUrl) {
+    const last = found.messages[found.messages.length - 1];
+    if (last?.from === "them") await touchContact("replied");
+    else await refreshContact();
+  }
 
   cacheKey = threadCacheKey(tab.url, found);
   detailsCollapsed = true;
@@ -539,6 +568,38 @@ function renderJobChip() {
   } else {
     jobChip.style.display = "none";
   }
+}
+
+// --- Outreach tracker ---
+async function refreshContact() {
+  if (!contactUrl) return;
+  try {
+    contact = await api.lookupContact(contactUrl);
+  } catch {
+    contact = null; // The tracker is optional; never block drafting on it.
+  }
+  renderTracker();
+}
+
+async function touchContact(event) {
+  if (!contactUrl) return;
+  try {
+    const updated = await api.touchContact({ linkedin_url: contactUrl, ...contactDetails, event });
+    if (updated) contact = updated;
+  } catch {
+    // Optional, as above.
+  }
+  renderTracker();
+}
+
+function renderTracker() {
+  if (!contact) {
+    trackerChip.style.display = "none";
+    return;
+  }
+  trackerText.textContent = `Tracker: ${trackerLabel(contact)}`;
+  markSentBtn.style.display = contact.status === "drafted" ? "inline" : "none";
+  trackerChip.style.display = "flex";
 }
 
 // --- Import your own LinkedIn profile into ConnectPilot ---
@@ -618,6 +679,8 @@ async function insertActiveDraft() {
     const outcome = result?.result;
     if (outcome?.ok) {
       show("Inserted. Review it in LinkedIn, then press Send yourself.");
+      // Insert is the strongest sign the message is going out: track it as sent.
+      touchContact("sent");
       return;
     }
     await navigator.clipboard.writeText(text);
@@ -679,6 +742,8 @@ function updateDetailsView() {
     const count = conversation?.messages.length ?? 0;
     const what = type === "recruiter_reply" ? "Replying to recruiter" : "Replying to";
     draftSummaryText.textContent = `${what} ${fields.name} · ${count} messages`;
+  } else if (collapse && type === "followup") {
+    draftSummaryText.textContent = `Following up with ${fields.name} · no reply for ${fields.days_since} days`;
   } else if (collapse) {
     const where = [fields.role, fields.company].filter(Boolean).join(" at ");
     const job = type === "referral_request" && fields.job_title ? ` · referral for ${fields.job_title}` : "";
@@ -703,7 +768,13 @@ function readFields(type) {
     case "recruiter_reply":
       return { name: value("rec-name"), company: value("rec-company"), job_title: value("rec-job") };
     case "followup":
-      return { name: value("fu-name"), company: value("fu-company"), role: value("fu-role") };
+      return {
+        name: value("fu-name"),
+        company: value("fu-company"),
+        role: value("fu-role"),
+        context: value("fu-context"),
+        days_since: value("fu-days"),
+      };
     default:
       return null;
   }

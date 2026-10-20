@@ -22,6 +22,8 @@ export const PROFILE_LIMITS = {
 const AUTO_REQUIRED = {
   connection_request: ["name", "company", "role"],
   referral_request: ["name", "company", "role", "job_title"],
+  // Filled from the tracker when a follow-up is due (see tracker.js).
+  followup: ["name", "company", "role", "context", "days_since"],
 };
 
 const normalise = (text) => (text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -35,13 +37,15 @@ export function jobMatchesCompany(job, company) {
 }
 
 /**
- * Message type for the page. On someone's profile: a referral request when the
- * saved job is at their company, otherwise a connection request. Null keeps
+ * Message type for the page. On someone's profile: a follow-up when the tracker
+ * says one is due, a referral request when the saved job is at their company,
+ * otherwise a connection request. Null keeps
  * whatever the user picked.
  */
-export function pickType({ page, company, pendingJob }) {
-  if (page === "profile") return jobMatchesCompany(pendingJob, company) ? "referral_request" : "connection_request";
-  return null;
+export function pickType({ page, company, pendingJob, contact = null }) {
+  if (page !== "profile") return null;
+  if (contact?.follow_up_due) return "followup";
+  return jobMatchesCompany(pendingJob, company) ? "referral_request" : "connection_request";
 }
 
 /**

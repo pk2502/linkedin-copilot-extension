@@ -122,7 +122,7 @@ export function readOwnProfile(doc) {
 /**
  * The LinkedIn conversation the user has open: the full messaging page or a
  * chat bubble. Returns null when none is open, otherwise
- * { name, headline, messages: [{ from: "them" | "me", name, date, time, text }] }
+ * { name, headline, profileHref, messages: [{ from: "them" | "me", name, date, time, text }] }
  * with the most recent messages last (at most 12).
  */
 export function readConversation(doc) {
@@ -151,6 +151,8 @@ export function readConversation(doc) {
     "h2",
   ]);
   const headline = firstText(scope, [".msg-entity-lockup__entity-info", ".msg-thread__link-to-profile .t-12"]);
+  const profileLink = scope.querySelector('.msg-thread__link-to-profile, a[href*="/in/"]');
+  const profileHref = profileLink?.getAttribute("href") || "";
 
   const items = [...scope.querySelectorAll(".msg-s-event-listitem")];
   // Some layouts don't mark the other person's messages; then go by sender name.
@@ -175,7 +177,7 @@ export function readConversation(doc) {
     }
   }
   if (!messages.length) return null;
-  return { name, headline, messages: messages.slice(-12) };
+  return { name, headline, profileHref, messages: messages.slice(-12) };
 }
 
 /**

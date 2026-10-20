@@ -168,6 +168,21 @@ export function createApi({ storage, fetchImpl = (...args) => fetch(...args), ap
     return request("/api/profile/", { method: "PUT", body: fields });
   }
 
+  /** Tracker contact for a LinkedIn profile URL, or null when not tracked. */
+  async function lookupContact(linkedinUrl) {
+    try {
+      return await request(`/api/contacts/lookup/?linkedin_url=${encodeURIComponent(linkedinUrl)}`);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  }
+
+  /** Report "sent" or "replied" for a profile: resolves to the contact, or null if ignored. */
+  function touchContact(details) {
+    return request("/api/contacts/touch/", { method: "POST", body: details });
+  }
+
   /**
    * Sign out: clear local tokens first, then ask the backend to revoke this
    * extension's refresh token. Best-effort with a short timeout; an offline or
@@ -211,6 +226,8 @@ export function createApi({ storage, fetchImpl = (...args) => fetch(...args), ap
     tweak,
     getProfile,
     saveProfile,
+    lookupContact,
+    touchContact,
     isSignedIn,
   };
 }

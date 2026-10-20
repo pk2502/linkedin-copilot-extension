@@ -41,6 +41,7 @@ Upload `dist/connectpilot-extension-<version>-store.zip`.
 > • It reads the profile or job you are viewing only when you open the extension and shows you what it read. Auto-draft (on by default) writes drafts as soon as you open it on a profile; switch it off to send nothing until you click Generate.
 > • Insert types the draft into LinkedIn's message box for you to review. It never presses Send.
 > • Your drafts are saved to your private history on the ConnectPilot web app, where you can search and delete them.
+> • A private tracker remembers who you wrote to, who replied and who needs a follow-up, and reminds you when one is due.
 >
 > Sign in with a ConnectPilot account, or through the web app with Google. Free accounts can generate up to 20 messages a day.
 >
@@ -84,7 +85,7 @@ Screenshots show the real popup rendered with fictional sample data (`store/tool
 
 **Data usage** (tick these):
 
-- **Personally identifiable information:** yes. The user's account username and email for sign-in; names of people the user writes to (from the profile or typed in).
+- **Personally identifiable information:** yes. The user's account username and email for sign-in; names, company, role and LinkedIn profile URL of people the user writes to (from the page or typed in), kept in the user's private outreach tracker until they delete it.
 - **Authentication information:** yes. Sign-in tokens stored locally; credentials sent to our API to sign in.
 - **Website content:** yes. Name, role, company, About, experience and education read from the LinkedIn profile the user is viewing, and the title, company and description of a job posting the user is viewing, only when the popup is opened. Used to write the draft; the About, experience, education and job description text is not stored. On the user's own profile, the headline, About, experience, education and skills are saved to their ConnectPilot profile only when they confirm the import.
 - **Personal communications:** yes. When the user opens the popup on a LinkedIn conversation, the latest messages of that one conversation (up to about 4,000 characters) are sent to our API to draft a reply. They are not stored.
